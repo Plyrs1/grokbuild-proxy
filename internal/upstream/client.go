@@ -39,8 +39,9 @@ type Config struct {
 
 // Client is a thin HTTP client for cli-chat-proxy.
 type Client struct {
-	cfg  Config
-	http *http.Client
+	cfg            Config
+	http           *http.Client
+	billingEnabled bool
 }
 
 // NewClient builds a Client with defaults applied.
@@ -65,7 +66,7 @@ func NewClient(cfg Config) *Client {
 			},
 		}
 	}
-	return &Client{cfg: cfg, http: hc}
+	return &Client{cfg: cfg, http: hc, billingEnabled: true}
 }
 
 // Config returns a copy of the active config.
@@ -82,6 +83,14 @@ func (c *Client) BaseURL() string {
 		return DefaultBaseURL
 	}
 	return c.cfg.BaseURL
+}
+
+// SetBillingEnabled controls whether billing checks are performed.
+func (c *Client) SetBillingEnabled(v bool) {
+	if c == nil {
+		return
+	}
+	c.billingEnabled = v
 }
 
 // RequestOptions customizes a single upstream call.

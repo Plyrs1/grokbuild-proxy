@@ -57,6 +57,9 @@ type BillingSnapshot struct {
 
 // GetBilling fetches monthly billing for the given access token.
 func (c *Client) GetBilling(ctx context.Context, accessToken string) (*MonthlyBilling, error) {
+	if !c.billingEnabled {
+		return &MonthlyBilling{}, nil
+	}
 	status, _, raw, err := c.DoJSON(ctx, http.MethodGet, "/billing", nil, RequestOptions{
 		AccessToken: accessToken,
 		Accept:      "application/json",
@@ -91,6 +94,9 @@ func (c *Client) GetBillingCredits(ctx context.Context, accessToken string) (*We
 
 // GetBillingSnapshot fetches monthly billing and best-effort weekly credits.
 func (c *Client) GetBillingSnapshot(ctx context.Context, accessToken string) (*BillingSnapshot, error) {
+	if !c.billingEnabled {
+		return &BillingSnapshot{}, nil
+	}
 	monthly, monthlyErr := c.GetBilling(ctx, accessToken)
 	weekly, weeklyErr := c.GetBillingCredits(ctx, accessToken)
 	snap := &BillingSnapshot{Monthly: monthly, Weekly: weekly}

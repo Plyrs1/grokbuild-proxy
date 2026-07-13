@@ -133,6 +133,7 @@ func main() {
 	}
 	upstreamConfig.HTTPClient = globalUpstreamHTTP
 	up := upstream.NewClient(upstreamConfig)
+	up.SetBillingEnabled(cfg.Billing.Enabled)
 
 	selector := lb.New(cfg.LB).SetHealthStore(store)
 
@@ -147,7 +148,9 @@ func main() {
 			}
 			credentialConfig := upstreamConfig
 			credentialConfig.HTTPClient = httpClient
-			return upstream.NewClient(credentialConfig), nil
+			up := upstream.NewClient(credentialConfig)
+			up.SetBillingEnabled(cfg.Billing.Enabled)
+			return up, nil
 		},
 		Refresher:     refresher,
 		Logger:        logger,

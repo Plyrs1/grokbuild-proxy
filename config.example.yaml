@@ -92,5 +92,7 @@ limits:
   max_body_bytes: 20971520
   request_timeout_sec: 600
   max_concurrent: 64
+billing:
+  enabled: true
 logging:
   level: info

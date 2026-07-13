@@ -48,6 +48,7 @@ type Config struct {
 	Inspection        InspectionConfig `yaml:"inspection"`
 	Import            ImportConfig     `yaml:"import"`
 	Limits            LimitsConfig     `yaml:"limits"`
+	Billing           BillingConfig    `yaml:"billing"`
 	Logging           LoggingConfig    `yaml:"logging"`
 }
 
@@ -142,6 +143,11 @@ type LimitsConfig struct {
 	MaxConcurrent     int   `yaml:"max_concurrent"`
 }
 
+// BillingConfig controls whether the proxy checks upstream billing/quota.
+type BillingConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
 // LoggingConfig controls structured logging verbosity.
 type LoggingConfig struct {
 	Level string `yaml:"level"`
@@ -230,6 +236,9 @@ func Default() Config {
 			MaxBodyBytes:      20 * 1024 * 1024,
 			RequestTimeoutSec: 600,
 			MaxConcurrent:     64,
+		},
+		Billing: BillingConfig{
+			Enabled: true,
 		},
 		Logging: LoggingConfig{
 			Level: "info",
