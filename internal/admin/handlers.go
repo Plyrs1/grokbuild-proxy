@@ -35,11 +35,14 @@ type Store interface {
 	UpdateCredential(c storage.Credential) (storage.Credential, error)
 	PatchCredential(id string, mutate func(*storage.Credential) error) (storage.Credential, error)
 	DeleteCredential(id string) error
+	DeleteCredentials(ids []string) error
 	SetCredentialEnabled(id string, enabled bool) (storage.Credential, error)
 	SetCredentialPriority(id string, priority int) (storage.Credential, error)
 	ListClients() ([]storage.ClientKey, error)
 	CreateClient(name string) (storage.CreateClientResult, error)
 	DeleteClient(id string) error
+	LoadProxyPool() (storage.ProxyPool, error)
+	SaveProxyPool(pool storage.ProxyPool) error
 }
 
 type credentialUpserter interface {
@@ -299,7 +302,7 @@ func (h *Handlers) CreateCredential(w http.ResponseWriter, r *http.Request) {
 		}
 		exp = t
 	}
-	created, err := h.Store.CreateCredential(storage.CreateCredentialInput{
+	input := storage.CreateCredentialInput{
 		Name:         body.Name,
 		Email:        body.Email,
 		UserID:       body.UserID,
@@ -311,7 +314,16 @@ func (h *Handlers) CreateCredential(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:    exp,
 		Enabled:      body.Enabled,
 		Priority:     body.Priority,
-	})
+	}
+	// Auto-assign proxy from pool when enabled and the input does not
+	// already carry an explicit proxy configuration.
+	if input.ProxyMode == "" {
+		if proxyURL := h.pickPoolProxy(); proxyURL != "" {
+			input.ProxyMode = storage.CredentialProxyURL
+			input.ProxyURL = proxyURL
+		}
+	}
+	created, err := h.Store.CreateCredential(input)
 	if err != nil {
 		if errors.Is(err, storage.ErrCredentialExists) {
 			writeErr(w, http.StatusConflict, "credential already exists; update or import it instead")
@@ -943,6 +955,67 @@ func (h *Handlers) DeleteCredential(w http.ResponseWriter, r *http.Request, id s
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": id})
 }
 
+// DeleteCredentialsBulk POST /admin/accounts/delete-bulk
+// Accepts {"ids": [...]} and/or {"emails": [...]}, deletes matching credentials.
+func (h *Handlers) DeleteCredentialsBulk(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IDs    []string `json:"ids"`
+		Emails []string `json:"emails"`
+	}
+	if err := decodeJSON(r, h.maxBody(), &body); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(body.IDs) == 0 && len(body.Emails) == 0 {
+		writeErr(w, http.StatusBadRequest, "provide \"ids\" or \"emails\"")
+		return
+	}
+
+	ids := body.IDs
+	if len(body.Emails) > 0 {
+		creds, err := h.Store.ListCredentials()
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		emailSet := make(map[string]bool, len(body.Emails))
+		for _, e := range body.Emails {
+			emailSet[strings.ToLower(strings.TrimSpace(e))] = true
+		}
+		for _, c := range creds {
+			if emailSet[strings.ToLower(strings.TrimSpace(c.Email))] {
+				ids = append(ids, c.ID)
+			}
+		}
+	}
+	if len(ids) == 0 {
+		writeErr(w, http.StatusNotFound, "no matching credentials found")
+		return
+	}
+
+	// Invalidate token caches before deletion.
+	if h.TokenCache != nil {
+		for _, id := range ids {
+			h.TokenCache.Invalidate(id)
+		}
+	}
+	if err := h.Store.DeleteCredentials(ids); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	// Invalidate again after deletion to retire any refresh that started before the delete.
+	if h.TokenCache != nil {
+		for _, id := range ids {
+			h.TokenCache.Invalidate(id)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"deleted_count": len(ids),
+		"deleted_ids":   ids,
+	})
+}
+
 // ListClients GET /admin/clients
 func (h *Handlers) ListClients(w http.ResponseWriter, r *http.Request) {
 	clients, err := h.Store.ListClients()
@@ -1007,6 +1080,329 @@ func (h *Handlers) System(w http.ResponseWriter, r *http.Request) {
 		},
 		"limits": h.Config.Limits,
 		"pool":   summarizePool(credentials, time.Now()),
+	})
+}
+
+// pickPoolProxy returns a proxy URL from the pool using round-robin
+// based on the count of credentials already assigned pool proxies.
+// Returns empty string when the pool is disabled or empty.
+func (h *Handlers) pickPoolProxy() string {
+	pool, err := h.Store.LoadProxyPool()
+	if err != nil || !pool.Enabled || len(pool.Proxies) == 0 {
+		return ""
+	}
+	creds, err := h.Store.ListCredentials()
+	if err != nil {
+		return ""
+	}
+	count := 0
+	for _, c := range creds {
+		if c.ProxyMode == storage.CredentialProxyURL && c.ProxyURL != "" {
+			count++
+		}
+	}
+	return pool.Proxies[count%len(pool.Proxies)]
+}
+
+// AdminSummary GET /admin/summary returns total, working, and error account counts.
+func (h *Handlers) AdminSummary(w http.ResponseWriter, r *http.Request) {
+	creds, err := h.Store.ListCredentials()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	now := time.Now()
+	total := len(creds)
+	working := 0
+	errorAccounts := 0
+	for _, c := range creds {
+		if !c.Enabled {
+			// Disabled without manual flag → counts as error
+			if !c.ManualDisabled {
+				errorAccounts++
+			}
+			continue
+		}
+		hasRefresh := strings.TrimSpace(c.RefreshToken) != ""
+		hasTokens := strings.TrimSpace(c.AccessToken) != "" || hasRefresh
+		if !hasTokens {
+			errorAccounts++
+			continue
+		}
+		expired := !c.ExpiresAt.IsZero() && !c.ExpiresAt.After(now)
+		if expired && !hasRefresh {
+			errorAccounts++
+			continue
+		}
+		if c.CooldownUntil != nil && c.CooldownUntil.After(now) {
+			errorAccounts++
+			continue
+		}
+		if strings.TrimSpace(c.LastError) != "" {
+			errorAccounts++
+			continue
+		}
+		working++
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"total_account":   total,
+		"working_account": working,
+		"error_account":   errorAccounts,
+	})
+}
+
+// GetProxyPool GET /admin/proxy-pool.
+func (h *Handlers) GetProxyPool(w http.ResponseWriter, r *http.Request) {
+	pool, err := h.Store.LoadProxyPool()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, pool)
+}
+
+// UpdateProxyPool PUT /admin/proxy-pool.
+func (h *Handlers) UpdateProxyPool(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Enabled *bool    `json:"enabled"`
+		Proxies []string `json:"proxies"`
+	}
+	if err := decodeJSON(r, h.maxBody(), &body); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	pool, err := h.Store.LoadProxyPool()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if body.Enabled != nil {
+		pool.Enabled = *body.Enabled
+	}
+	if body.Proxies != nil {
+		pool.Proxies = body.Proxies
+	}
+	if err := h.Store.SaveProxyPool(pool); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, pool)
+}
+
+// AssignProxiesFromPool POST /admin/proxy-pool/assign.
+// mode "missing" assigns a proxy to credentials without one;
+// mode "all" overrides all credentials with a proxy from the pool.
+func (h *Handlers) AssignProxiesFromPool(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Mode string `json:"mode"` // "missing" or "all"
+	}
+	if err := decodeJSON(r, h.maxBody(), &body); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	mode := strings.ToLower(strings.TrimSpace(body.Mode))
+	if mode != "missing" && mode != "all" {
+		writeErr(w, http.StatusBadRequest, "mode must be \"missing\" or \"all\"")
+		return
+	}
+	h.assignProxies(w, mode)
+}
+
+// ListProxies GET /admin/proxies returns the list of proxy URLs from the pool.
+func (h *Handlers) ListProxies(w http.ResponseWriter, r *http.Request) {
+	pool, err := h.Store.LoadProxyPool()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"proxies":  pool.Proxies,
+		"enabled":  pool.Enabled,
+	})
+}
+
+// AddProxy POST /admin/proxies adds one or more proxy URLs to the pool.
+func (h *Handlers) AddProxy(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Proxy   string   `json:"proxy"`
+		Proxies []string `json:"proxies"`
+	}
+	if err := decodeJSON(r, h.maxBody(), &body); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	addrs := body.Proxies
+	if body.Proxy != "" {
+		addrs = append(addrs, body.Proxy)
+	}
+	if len(addrs) == 0 {
+		writeErr(w, http.StatusBadRequest, "provide \"proxy\" or \"proxies\" field")
+		return
+	}
+	pool, err := h.Store.LoadProxyPool()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	existing := make(map[string]bool, len(pool.Proxies))
+	for _, p := range pool.Proxies {
+		existing[p] = true
+	}
+	for _, addr := range addrs {
+		addr = strings.TrimSpace(addr)
+		if addr == "" || existing[addr] {
+			continue
+		}
+		pool.Proxies = append(pool.Proxies, addr)
+		existing[addr] = true
+	}
+	if err := h.Store.SaveProxyPool(pool); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"proxies": pool.Proxies,
+		"enabled": pool.Enabled,
+	})
+}
+
+// DeleteProxy DELETE /admin/proxies removes a proxy URL from the pool.
+func (h *Handlers) DeleteProxy(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Proxy string `json:"proxy"`
+	}
+	if err := decodeJSON(r, h.maxBody(), &body); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	proxy := strings.TrimSpace(body.Proxy)
+	if proxy == "" {
+		writeErr(w, http.StatusBadRequest, "provide \"proxy\" field")
+		return
+	}
+	pool, err := h.Store.LoadProxyPool()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	found := false
+	filtered := make([]string, 0, len(pool.Proxies))
+	for _, p := range pool.Proxies {
+		if p == proxy {
+			found = true
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+	if !found {
+		writeErr(w, http.StatusNotFound, "proxy not found in pool")
+		return
+	}
+	pool.Proxies = filtered
+	if err := h.Store.SaveProxyPool(pool); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"proxies": pool.Proxies,
+		"enabled": pool.Enabled,
+	})
+}
+
+// ToggleProxyPool POST /admin/proxies/pool/toggle enables or disables the proxy pool.
+func (h *Handlers) ToggleProxyPool(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Enabled *bool `json:"enabled"`
+	}
+	// Body is optional; decode ignoring errors (empty body is fine).
+	_ = decodeJSON(r, h.maxBody(), &body)
+
+	pool, err := h.Store.LoadProxyPool()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if body.Enabled != nil {
+		pool.Enabled = *body.Enabled
+	} else {
+		pool.Enabled = !pool.Enabled
+	}
+	if err := h.Store.SaveProxyPool(pool); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"proxies": pool.Proxies,
+		"enabled": pool.Enabled,
+	})
+}
+
+// AssignProxies POST /admin/accounts/assign-proxies assigns proxies from the pool
+// to existing accounts. Takes {"override_all": true} to override all accounts,
+// or {"override_all": false} to only assign to accounts without a proxy.
+func (h *Handlers) AssignProxies(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		OverrideAll bool `json:"override_all"`
+	}
+	if err := decodeJSON(r, h.maxBody(), &body); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	mode := "missing"
+	if body.OverrideAll {
+		mode = "all"
+	}
+	h.assignProxies(w, mode)
+}
+
+// assignProxies is the shared implementation for assigning proxies from the pool.
+func (h *Handlers) assignProxies(w http.ResponseWriter, mode string) {
+	pool, err := h.Store.LoadProxyPool()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !pool.Enabled || len(pool.Proxies) == 0 {
+		writeErr(w, http.StatusBadRequest, "proxy pool is not enabled or empty")
+		return
+	}
+
+	creds, err := h.Store.ListCredentials()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	updated := make([]maskedCredential, 0)
+	proxyIndex := 0
+	for _, c := range creds {
+		if mode == "missing" {
+			// Skip credentials that already have a proxy configured (not inherit/empty)
+			if c.ProxyMode == storage.CredentialProxyURL && c.ProxyURL != "" {
+				continue
+			}
+		}
+		// Assign proxy round-robin
+		proxyURL := pool.Proxies[proxyIndex%len(pool.Proxies)]
+		proxyIndex++
+
+		patched, err := h.Store.PatchCredential(c.ID, func(credential *storage.Credential) error {
+			credential.ProxyMode = storage.CredentialProxyURL
+			credential.ProxyURL = proxyURL
+			return nil
+		})
+		if err != nil {
+			continue
+		}
+		if h.TokenCache != nil {
+			h.TokenCache.Invalidate(c.ID)
+		}
+		updated = append(updated, h.maskedCredential(patched))
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"assigned":    len(updated),
+		"credentials": updated,
 	})
 }
 

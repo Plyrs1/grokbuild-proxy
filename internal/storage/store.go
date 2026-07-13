@@ -16,6 +16,7 @@ const (
 	clientsFile     = "clients.json"
 	metaFile        = "meta.json"
 	settingsFile    = "settings.json"
+	proxiesFile     = "proxies.json"
 	fileMode        = 0o600
 	dirMode         = 0o700
 
@@ -185,6 +186,10 @@ func (s *Store) metaPath() string {
 
 func (s *Store) settingsPath() string {
 	return filepath.Join(s.dir, settingsFile)
+}
+
+func (s *Store) proxiesPath() string {
+	return filepath.Join(s.dir, proxiesFile)
 }
 
 // withLock serializes all store operations with process-local mutex and

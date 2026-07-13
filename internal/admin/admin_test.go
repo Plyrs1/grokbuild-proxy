@@ -216,6 +216,15 @@ func (f *fakeStore) DeleteCredential(id string) error {
 	return nil
 }
 
+func (f *fakeStore) DeleteCredentials(ids []string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, id := range ids {
+		delete(f.creds, id)
+	}
+	return nil
+}
+
 func (f *fakeStore) SetCredentialEnabled(id string, enabled bool) (storage.Credential, error) {
 	c, err := f.GetCredential(id)
 	if err != nil {
@@ -276,6 +285,14 @@ func (f *fakeStore) DeleteClient(id string) error {
 		return errNF("client", id)
 	}
 	delete(f.cli, id)
+	return nil
+}
+
+func (f *fakeStore) LoadProxyPool() (storage.ProxyPool, error) {
+	return storage.ProxyPool{Enabled: false, Proxies: []string{}}, nil
+}
+
+func (f *fakeStore) SaveProxyPool(pool storage.ProxyPool) error {
 	return nil
 }
 

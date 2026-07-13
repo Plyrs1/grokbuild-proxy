@@ -38,6 +38,7 @@
         </div>
         <nav class="nav" id="main-nav" aria-label="主导航">
           <a href="#/credentials" data-route="credentials">Credentials</a>
+          <a href="#/proxies" data-route="proxies">Proxy Pool</a>
           <a href="#/clients" data-route="clients">Client Keys</a>
           <a href="#/settings" data-route="settings">Settings</a>
           <a href="#/system" data-route="system">System Info</a>
@@ -53,13 +54,30 @@
           <div class="page-head">
             <div>
               <h2>Credentials</h2>
+              <div class="row gap muted">
+                <span>Total: <strong id="stat-total-acc">0</strong></span> &middot;
+                <span>Working: <strong id="stat-working-acc" class="tone-ok">0</strong></span> &middot;
+                <span>Error: <strong id="stat-error-acc" class="tone-danger">0</strong></span>
+              </div>
               <p class="muted">Grok authorized account pool · Enable/Disable / Priority / Refresh Token / Billing</p>
             </div>
-            <div class="row gap">
-              <button type="button" class="btn" id="btn-cred-refresh-list">Refresh List</button>
-              <button type="button" class="btn btn-primary" id="btn-device-login">Browser Login</button>
-              <button type="button" class="btn btn-primary" id="btn-import-default">Import ~/.grok</button>
-              <button type="button" class="btn" id="btn-import-raw">Batch Import</button>
+            <div class="row gap" style="width: 100%; justify-content: space-between; flex-wrap: wrap; margin-top: 8px;">
+              <div class="row gap muted" style="align-items: center; min-height: 32px;">
+                <label class="row gap" style="margin-bottom: 0; cursor: pointer;">
+                  <input type="checkbox" id="chk-cred-select-all" />
+                  <span>Select All</span>
+                </label>
+                <button type="button" class="btn btn-sm btn-ghost" id="btn-cred-select-expired">Select Expired</button>
+                <button type="button" class="btn btn-sm btn-danger hidden" id="btn-cred-delete-selected">Delete Selected</button>
+                <button type="button" class="btn btn-sm hidden" id="btn-cred-export-selected">Export Selected</button>
+              </div>
+              <div class="row gap">
+                <button type="button" class="btn" id="btn-cred-assign-proxy">Assign Proxy</button>
+                <button type="button" class="btn" id="btn-cred-refresh-list">Refresh List</button>
+                <button type="button" class="btn btn-primary" id="btn-device-login">Browser Login</button>
+                <button type="button" class="btn btn-primary" id="btn-import-default">Import ~/.grok</button>
+                <button type="button" class="btn" id="btn-import-raw">Batch Import</button>
+              </div>
             </div>
           </div>
           <div id="cred-empty" class="empty card hidden">
@@ -67,6 +85,28 @@
             <p class="muted">Import from the default local path, or batch upload Grok / CPA JSON and SSO files.</p>
           </div>
           <div id="cred-list" class="card-grid"></div>
+        </section>
+
+        <section id="page-proxies" class="page hidden">
+          <div class="page-head">
+            <div>
+              <h2>Proxy Pool</h2>
+              <p class="muted">List of proxies that can be assigned to accounts. If proxy pool enabled, new accounts get a proxy assigned automatically.</p>
+            </div>
+            <div class="row gap">
+              <label class="row gap">
+                <input type="checkbox" id="chk-proxy-pool-enabled" />
+                <span>Enable Proxy Pool</span>
+              </label>
+              <button type="button" class="btn" id="btn-proxy-refresh">Refresh</button>
+              <button type="button" class="btn btn-primary" id="btn-proxy-add">Add Proxy</button>
+            </div>
+          </div>
+          <div id="proxy-empty" class="empty card hidden">
+            <h3>No Proxies in Pool</h3>
+            <p class="muted">Add proxies to start building your proxy pool.</p>
+          </div>
+          <div id="proxy-list" class="table-wrap card"></div>
         </section>
 
         <section id="page-clients" class="page hidden">

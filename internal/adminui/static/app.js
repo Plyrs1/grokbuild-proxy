@@ -195,12 +195,14 @@
 
     setActiveNav(route);
     show($("page-credentials"), route === "credentials");
+    show($("page-proxies"), route === "proxies");
     show($("page-clients"), route === "clients");
     show($("page-settings"), route === "settings");
     show($("page-system"), route === "system");
     show($("page-integration"), route === "integration");
 
     if (route === "credentials") loadCredentials();
+    else if (route === "proxies") loadProxies();
     else if (route === "clients") loadClients();
     else if (route === "settings") loadSettings();
     else if (route === "system") loadSystem();
@@ -247,6 +249,144 @@
       });
   }
 
+  // ---------- Formatting & Selection Helpers ----------
+  
+  function updateCredentialSelectionUI() {
+    var checkboxes = document.querySelectorAll(".cred-checkbox");
+    var checked = document.querySelectorAll(".cred-checkbox:checked");
+    var selectAll = $("chk-cred-select-all");
+    
+    if (selectAll) {
+      selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+      selectAll.indeterminate = checked.length > 0 && checked.length < checkboxes.length;
+    }
+    
+    show($("btn-cred-delete-selected"), checked.length > 0);
+    show($("btn-cred-export-selected"), checked.length > 0);
+  }
+
+  function handleCredentialSelectAll() {
+    var selectAll = $("chk-cred-select-all");
+    if (!selectAll) return;
+    
+    var checkboxes = document.querySelectorAll(".cred-checkbox");
+    var isChecked = selectAll.checked;
+    
+    checkboxes.forEach(function(chk) {
+      chk.checked = isChecked;
+    });
+    
+    updateCredentialSelectionUI();
+  }
+
+  function handleCredentialSelectExpired() {
+    var checkboxes = document.querySelectorAll(".cred-checkbox");
+    var anyChecked = false;
+    
+    checkboxes.forEach(function(chk) {
+      if (chk.dataset.expired === "true") {
+        chk.checked = true;
+        anyChecked = true;
+      } else {
+        chk.checked = false;
+      }
+    });
+    
+    if (!anyChecked) {
+      toast("No expired accounts found", "ok");
+    }
+    
+    updateCredentialSelectionUI();
+  }
+  
+  function handleCredentialDeleteSelected() {
+    var checked = document.querySelectorAll(".cred-checkbox:checked");
+    if (checked.length === 0) return;
+    
+    if (!confirm("Confirm delete " + checked.length + " selected credentials?")) return;
+    
+    var ids = [];
+    checked.forEach(function(chk) {
+      ids.push(chk.value);
+    });
+    
+    var btn = $("btn-cred-delete-selected");
+    if (btn) btn.disabled = true;
+    
+    // Check if bulk delete exists
+    api("POST", "/admin/credentials/delete-bulk", { ids: ids })
+      .then(function(res) {
+        toast("Deleted " + (res.deleted || ids.length) + " credentials", "ok");
+        loadCredentials();
+        var selectAll = $("chk-cred-select-all");
+        if (selectAll) {
+          selectAll.checked = false;
+          selectAll.indeterminate = false;
+        }
+      })
+      .catch(function(err) {
+        // Fallback to loop if bulk endpoint not available
+        toast("Bulk delete failed, trying individually: " + err.message, "warn");
+        
+        var promises = ids.map(function(id) {
+          return api("DELETE", "/admin/credentials/" + encodeURIComponent(id))
+            .catch(function(e) {
+              console.error("Failed to delete " + id, e);
+            });
+        });
+        
+        Promise.all(promises).then(function() {
+          toast("Finished deleting selected credentials", "ok");
+          loadCredentials();
+          var selectAll = $("chk-cred-select-all");
+          if (selectAll) {
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
+          }
+        });
+      })
+      .finally(function() {
+        if (btn) btn.disabled = false;
+      });
+  }
+  
+  function handleCredentialExportSelected() {
+    var checked = document.querySelectorAll(".cred-checkbox:checked");
+    if (checked.length === 0) return;
+    
+    var data = [];
+    checked.forEach(function(chk) {
+      try {
+        if (chk.dataset.raw) {
+          data.push(JSON.parse(chk.dataset.raw));
+        }
+      } catch(e) {
+        console.error("Failed to parse raw credential for export", e);
+      }
+    });
+    
+    if (data.length === 0) {
+      toast("No valid data to export", "err");
+      return;
+    }
+    
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "grokbuild-credentials-" + new Date().toISOString().slice(0, 10) + ".json";
+    document.body.appendChild(a);
+    a.click();
+    
+    setTimeout(function() {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+    
+    toast("Exported " + data.length + " credentials", "ok");
+  }
+
   // ---------- Format helpers ----------
 
   function fmtTime(v) {
@@ -287,6 +427,18 @@
     if (!list) return;
     clear(list);
     show(empty, false);
+    
+    // Also load summary stats
+    api("GET", "/admin/summary")
+      .then(function (summary) {
+        setText($("stat-total-acc"), summary.total_accounts || 0);
+        setText($("stat-working-acc"), summary.working_accounts || 0);
+        setText($("stat-error-acc"), summary.error_accounts || 0);
+      })
+      .catch(function (err) {
+        console.error("Failed to load summary", err);
+      });
+
     api("GET", "/admin/credentials")
       .then(function (data) {
         var creds = (data && data.credentials) || [];
@@ -297,6 +449,14 @@
         creds.forEach(function (c) {
           list.appendChild(renderCredentialCard(c));
         });
+        
+        // Reset selection UI when list reloads
+        var selectAll = $("chk-cred-select-all");
+        if (selectAll) {
+          selectAll.checked = false;
+          selectAll.indeterminate = false;
+        }
+        updateCredentialSelectionUI();
       })
       .catch(function (err) {
         toast("Failed to load credentials: " + err.message, "err");
@@ -308,12 +468,33 @@
     card.dataset.id = c.id || "";
 
     var top = el("div", "cred-top");
-    var left = el("div");
-    var title = el("h3", "cred-title", c.name || c.email || c.id || "(unnamed)");
-    left.appendChild(title);
-    if (c.email && c.email !== c.name) {
-      left.appendChild(el("div", "muted", c.email));
+    var left = el("div", "row gap");
+    left.style.alignItems = "center";
+    
+    var chk = el("input", "cred-checkbox");
+    chk.type = "checkbox";
+    chk.value = c.id || "";
+    // Store reference to raw object so we can use it for export later
+    chk.dataset.raw = JSON.stringify(c);
+    
+    // Status identifier for quick selection (e.g., expired)
+    var isExpired = false;
+    if (c.last_inspection_status === "unauthorized" || c.last_inspection_status === "unauthorized_unconfirmed" || c.lifecycle_state === "quarantined") {
+      isExpired = true;
     }
+    chk.dataset.expired = isExpired;
+    
+    chk.addEventListener("change", updateCredentialSelectionUI);
+    
+    left.appendChild(chk);
+    
+    var titleBox = el("div");
+    var title = el("h3", "cred-title", c.name || c.email || c.id || "(unnamed)");
+    titleBox.appendChild(title);
+    if (c.email && c.email !== c.name) {
+      titleBox.appendChild(el("div", "muted", c.email));
+    }
+    left.appendChild(titleBox);
     top.appendChild(left);
 
     var quarantined = c.lifecycle_state === "quarantined";
@@ -1035,6 +1216,172 @@
     setText(node, lines.join("\n"));
   }
 
+  // ---------- Proxies ----------
+
+  function loadProxies() {
+    var wrap = $("proxy-list");
+    var empty = $("proxy-empty");
+    var chkEnabled = $("chk-proxy-pool-enabled");
+    if (!wrap) return;
+    clear(wrap);
+    show(empty, false);
+    show(wrap, true);
+    
+    // Disable checkbox temporarily while loading
+    if (chkEnabled) chkEnabled.disabled = true;
+
+    api("GET", "/admin/proxies")
+      .then(function (data) {
+        var proxies = (data && data.proxies) || [];
+        if (chkEnabled) {
+          chkEnabled.checked = !!data.pool_enabled;
+          chkEnabled.disabled = false;
+        }
+        
+        if (!proxies.length) {
+          show(empty, true);
+          show(wrap, false);
+          return;
+        }
+        wrap.appendChild(renderProxyTable(proxies));
+      })
+      .catch(function (err) {
+        toast("Failed to load proxies: " + err.message, "err");
+        if (chkEnabled) chkEnabled.disabled = false;
+      });
+  }
+
+  function renderProxyTable(proxies) {
+    var table = el("table");
+    var thead = el("thead");
+    var hr = el("tr");
+    ["URL", "Status", ""].forEach(function (h) {
+      hr.appendChild(el("th", "", h));
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    var tbody = el("tbody");
+    proxies.forEach(function (p) {
+      var tr = el("tr");
+      var urlTd = el("td");
+      urlTd.appendChild(el("code", "", p.url || "\u2014"));
+      tr.appendChild(urlTd);
+      
+      var st = el("td");
+      st.appendChild(
+        el(
+          "span",
+          "badge " + (p.status === "error" ? "badge-danger" : "badge-ok"),
+          p.status === "error" ? "Error" : "Active"
+        )
+      );
+      tr.appendChild(st);
+
+      var act = el("td");
+      var del = el("button", "btn btn-sm btn-danger", "Remove");
+      del.type = "button";
+      del.addEventListener("click", function () {
+        if (!confirm("Confirm remove proxy " + p.url + " ?")) return;
+        del.disabled = true;
+        api("DELETE", "/admin/proxies", { proxy: p.url })
+          .then(function () {
+            toast("Proxy removed", "ok");
+            loadProxies();
+          })
+          .catch(function (err) {
+            toast("Remove failed: " + err.message, "err");
+            del.disabled = false;
+          });
+      });
+      act.appendChild(del);
+      tr.appendChild(act);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function openAddProxyModal() {
+    var body = el("div", "stack");
+    var field = el("label", "field");
+    field.appendChild(el("span", "label", "Proxy URL"));
+    var input = el("input");
+    input.type = "text";
+    input.placeholder = "http://user:pass@host:port";
+    field.appendChild(input);
+    body.appendChild(field);
+    body.appendChild(el("p", "muted", "Proxy format: http://user:pass@host:port or socks5://host:port"));
+
+    var cancel = el("button", "btn", "Cancel");
+    cancel.type = "button";
+    cancel.addEventListener("click", closeModal);
+
+    var ok = el("button", "btn btn-primary", "Add");
+    ok.type = "button";
+    ok.addEventListener("click", function () {
+      var url = (input.value || "").trim();
+      if (!url) {
+        toast("Please enter a proxy URL", "err");
+        return;
+      }
+      ok.disabled = true;
+      api("POST", "/admin/proxies", { proxy: url })
+        .then(function () {
+          toast("Proxy added", "ok");
+          closeModal();
+          loadProxies();
+        })
+        .catch(function (err) {
+          toast("Add failed: " + err.message, "err");
+          ok.disabled = false;
+        });
+    });
+
+    openModal("Add Proxy", body, [cancel, ok]);
+  }
+  
+  function openAssignProxyModal() {
+    var body = el("div", "stack");
+    body.appendChild(el("p", "muted", "Assign proxies from the pool to your credentials."));
+    
+    var modeField = el("label", "field");
+    modeField.appendChild(el("span", "label", "Target"));
+    var mode = el("select");
+    [
+      ["missing", "Only accounts without a proxy"],
+      ["all", "Override all accounts"]
+    ].forEach(function (option) {
+      var node = el("option", "", option[1]);
+      node.value = option[0];
+      mode.appendChild(node);
+    });
+    modeField.appendChild(mode);
+    body.appendChild(modeField);
+
+    var cancel = el("button", "btn", "Cancel");
+    cancel.type = "button";
+    cancel.addEventListener("click", closeModal);
+
+    var ok = el("button", "btn btn-primary", "Assign");
+    ok.type = "button";
+    ok.addEventListener("click", function () {
+      ok.disabled = true;
+      api("POST", "/admin/accounts/assign-proxies", { override_all: mode.value === "all" })
+        .then(function (res) {
+          toast("Assigned proxies to " + (res.assigned_count || 0) + " accounts", "ok");
+          closeModal();
+          loadCredentials();
+        })
+        .catch(function (err) {
+          toast("Assign failed: " + err.message, "err");
+          ok.disabled = false;
+        });
+    });
+
+    openModal("Assign Proxies", body, [cancel, ok]);
+  }
+
   // ---------- Clients ----------
 
   function loadClients() {
@@ -1576,6 +1923,45 @@
 
     var sysRefresh = $("btn-system-refresh");
     if (sysRefresh) sysRefresh.addEventListener("click", loadSystem);
+
+    var proxyRefresh = $("btn-proxy-refresh");
+    if (proxyRefresh) proxyRefresh.addEventListener("click", loadProxies);
+    
+    var proxyAdd = $("btn-proxy-add");
+    if (proxyAdd) proxyAdd.addEventListener("click", openAddProxyModal);
+    
+    var credAssign = $("btn-cred-assign-proxy");
+    if (credAssign) credAssign.addEventListener("click", openAssignProxyModal);
+    
+    var chkProxyEnabled = $("chk-proxy-pool-enabled");
+    if (chkProxyEnabled) {
+      chkProxyEnabled.addEventListener("change", function() {
+        chkProxyEnabled.disabled = true;
+        api("POST", "/admin/proxies/pool/toggle", { enabled: chkProxyEnabled.checked })
+          .then(function() {
+            toast(chkProxyEnabled.checked ? "Proxy pool enabled" : "Proxy pool disabled", "ok");
+            loadProxies();
+          })
+          .catch(function(err) {
+            chkProxyEnabled.checked = !chkProxyEnabled.checked;
+            toast("Failed to toggle proxy pool: " + err.message, "err");
+            chkProxyEnabled.disabled = false;
+          });
+      });
+    }
+
+    // Credential Selection Action Bindings
+    var selectAll = $("chk-cred-select-all");
+    if (selectAll) selectAll.addEventListener("change", handleCredentialSelectAll);
+    
+    var selectExpired = $("btn-cred-select-expired");
+    if (selectExpired) selectExpired.addEventListener("click", handleCredentialSelectExpired);
+    
+    var deleteSelected = $("btn-cred-delete-selected");
+    if (deleteSelected) deleteSelected.addEventListener("click", handleCredentialDeleteSelected);
+    
+    var exportSelected = $("btn-cred-export-selected");
+    if (exportSelected) exportSelected.addEventListener("click", handleCredentialExportSelected);
 
     var settingsRefresh = $("btn-settings-refresh");
     if (settingsRefresh) settingsRefresh.addEventListener("click", loadSettings);

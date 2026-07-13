@@ -625,6 +625,33 @@ func (s *Store) DeleteCredential(id string) error {
 	})
 }
 
+// DeleteCredentials removes multiple credentials by id. Non-existent IDs are
+// silently skipped. The full operation is atomic (one store lock, one write).
+func (s *Store) DeleteCredentials(ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	idSet := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		idSet[id] = struct{}{}
+	}
+	return s.withLock(func() error {
+		doc, err := s.loadCredentials()
+		if err != nil {
+			return err
+		}
+		next := make([]Credential, 0, len(doc.Credentials))
+		for _, c := range doc.Credentials {
+			if _, ok := idSet[c.ID]; ok {
+				continue
+			}
+			next = append(next, c)
+		}
+		doc.Credentials = next
+		return s.saveCredentials(doc)
+	})
+}
+
 // DeleteCredentialIfPurgeEligible atomically removes an automatically
 // quarantined credential only when the quarantine evidence observed by the
 // caller is still current. The lifecycle, purge deadline, quarantine token

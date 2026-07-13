@@ -66,6 +66,22 @@ func (h *Handlers) Register(mux *http.ServeMux) {
 		h.DeleteClient(w, r, r.PathValue("id"))
 	})
 
+	// Summary
+	mux.HandleFunc("GET /admin/summary", h.AdminSummary)
+
+	// Proxy pool
+	mux.HandleFunc("GET /admin/proxy-pool", h.GetProxyPool)
+	mux.HandleFunc("PUT /admin/proxy-pool", h.UpdateProxyPool)
+	mux.HandleFunc("POST /admin/proxy-pool/assign", h.AssignProxiesFromPool)
+
+	// Frontend-facing proxy endpoints
+	mux.HandleFunc("GET /admin/proxies", h.ListProxies)
+	mux.HandleFunc("POST /admin/proxies", h.AddProxy)
+	mux.HandleFunc("DELETE /admin/proxies", h.DeleteProxy)
+	mux.HandleFunc("POST /admin/proxies/pool/toggle", h.ToggleProxyPool)
+	mux.HandleFunc("POST /admin/accounts/assign-proxies", h.AssignProxies)
+	mux.HandleFunc("POST /admin/accounts/delete-bulk", h.DeleteCredentialsBulk)
+
 	// System
 	mux.HandleFunc("GET /admin/system", h.System)
 
@@ -108,6 +124,26 @@ func (h *Handlers) dispatchFallback(w http.ResponseWriter, r *http.Request) {
 		h.ListClients(w, r)
 	case path == "/admin/clients" && r.Method == http.MethodPost:
 		h.CreateClient(w, r)
+	case path == "/admin/summary" && r.Method == http.MethodGet:
+		h.AdminSummary(w, r)
+	case path == "/admin/proxy-pool" && r.Method == http.MethodGet:
+		h.GetProxyPool(w, r)
+	case path == "/admin/proxy-pool" && r.Method == http.MethodPut:
+		h.UpdateProxyPool(w, r)
+	case path == "/admin/proxy-pool/assign" && r.Method == http.MethodPost:
+		h.AssignProxiesFromPool(w, r)
+	case path == "/admin/proxies" && r.Method == http.MethodGet:
+		h.ListProxies(w, r)
+	case path == "/admin/proxies" && r.Method == http.MethodPost:
+		h.AddProxy(w, r)
+	case path == "/admin/proxies" && r.Method == http.MethodDelete:
+		h.DeleteProxy(w, r)
+	case path == "/admin/proxies/pool/toggle" && r.Method == http.MethodPost:
+		h.ToggleProxyPool(w, r)
+	case path == "/admin/accounts/assign-proxies" && r.Method == http.MethodPost:
+		h.AssignProxies(w, r)
+	case path == "/admin/accounts/delete-bulk" && r.Method == http.MethodPost:
+		h.DeleteCredentialsBulk(w, r)
 	case path == "/admin/system" && r.Method == http.MethodGet:
 		h.System(w, r)
 	default:
