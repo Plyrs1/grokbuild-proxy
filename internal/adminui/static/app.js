@@ -55,7 +55,7 @@
 
   function openModal(title, bodyNode, footNodes) {
     var modal = $("modal");
-    setText($("modal-title"), title || "对话框");
+    setText($("modal-title"), title || "Dialog");
     var body = $("modal-body");
     clear(body);
     if (bodyNode) body.appendChild(bodyNode);
@@ -81,7 +81,7 @@
       if (data.error.message) return data.error.message;
     }
     if (data && data.message) return data.message;
-    return "请求失败 HTTP " + status;
+    return "Request failed HTTP " + status;
   }
 
   function api(method, path, body) {
@@ -108,7 +108,7 @@
         }
         if (res.status === 401) {
           logout(true);
-          var err401 = new Error(apiErrorMessage(data, res.status) || "未授权");
+          var err401 = new Error(apiErrorMessage(data, res.status) || "Unauthorized");
           err401.status = 401;
           throw err401;
         }
@@ -138,7 +138,7 @@
         }
         if (res.status === 401) {
           logout(true);
-          throw new Error(apiErrorMessage(data, res.status) || "未授权");
+          throw new Error(apiErrorMessage(data, res.status) || "Unauthorized");
         }
         if (!res.ok) {
           var err = new Error(apiErrorMessage(data, res.status));
@@ -212,7 +212,7 @@
   function logout(silent) {
     state.key = "";
     state.system = null;
-    if (!silent) toast("已退出", "ok");
+    if (!silent) toast("Logged out", "ok");
     navigate("login");
     render();
   }
@@ -220,7 +220,7 @@
   function login(key) {
     key = (key || "").trim();
     if (!key) {
-      setText($("login-error"), "请输入管理员密钥");
+      setText($("login-error"), "Please enter admin key");
       show($("login-error"), true);
       return Promise.resolve();
     }
@@ -232,14 +232,14 @@
     return api("GET", "/admin/system")
       .then(function (sys) {
         state.system = sys;
-        setText($("shell-version"), (sys && sys.version) || "管理后台");
-        toast("登录成功", "ok");
+        setText($("shell-version"), (sys && sys.version) || "Admin Panel");
+        toast("Login successful", "ok");
         navigate("credentials");
         render();
       })
       .catch(function (err) {
         state.key = prev;
-        setText($("login-error"), err.message || "登录失败");
+        setText($("login-error"), err.message || "Login failed");
         show($("login-error"), true);
       })
       .finally(function () {
@@ -250,7 +250,7 @@
   // ---------- Format helpers ----------
 
   function fmtTime(v) {
-    if (!v) return "—";
+    if (!v) return "\u2014";
     try {
       var d = new Date(v);
       if (isNaN(d.getTime())) return String(v);
@@ -261,22 +261,22 @@
   }
 
   function shortId(id) {
-    if (!id) return "—";
+    if (!id) return "\u2014";
     if (id.length <= 12) return id;
-    return id.slice(0, 6) + "…" + id.slice(-4);
+    return id.slice(0, 6) + "\u2026" + id.slice(-4);
   }
 
   function inspectionStatusText(status) {
     var labels = {
-      healthy: "健康",
-      unauthorized: "认证失效",
-      unauthorized_unconfirmed: "待确认的认证失效",
-      rate_limited: "触发限流",
-      mass_failure_guard: "批量异常保护",
-      state_changed: "凭证已变更，结果未应用",
-      settings_changed: "巡检设置已变更，结果未应用",
+      healthy: "Healthy",
+      unauthorized: "Unauthorized",
+      unauthorized_unconfirmed: "Unconfirmed unauthorized",
+      rate_limited: "Rate limited",
+      mass_failure_guard: "Mass failure guard",
+      state_changed: "Credential changed, results not applied",
+      settings_changed: "Inspection settings changed, results not applied",
     };
-    return labels[status] || status || "未记录";
+    return labels[status] || status || "No record";
   }
 
   // ---------- Credentials ----------
@@ -299,7 +299,7 @@
         });
       })
       .catch(function (err) {
-        toast("加载凭证失败: " + err.message, "err");
+        toast("Failed to load credentials: " + err.message, "err");
       });
   }
 
@@ -309,7 +309,7 @@
 
     var top = el("div", "cred-top");
     var left = el("div");
-    var title = el("h3", "cred-title", c.name || c.email || c.id || "（未命名）");
+    var title = el("h3", "cred-title", c.name || c.email || c.id || "(unnamed)");
     left.appendChild(title);
     if (c.email && c.email !== c.name) {
       left.appendChild(el("div", "muted", c.email));
@@ -320,73 +320,73 @@
     var badge = el(
       "span",
       "badge " + (c.enabled ? "badge-ok" : quarantined ? "badge-danger" : "badge-off"),
-      c.enabled ? "已启用" : quarantined ? "已隔离" : "已禁用"
+      c.enabled ? "Enabled" : quarantined ? "Quarantined" : "Disabled"
     );
     top.appendChild(badge);
     card.appendChild(top);
 
     var meta = el("div", "cred-meta");
-    meta.appendChild(lineMeta("编号", shortId(c.id)));
-    meta.appendChild(lineMeta("优先级", String(c.priority != null ? c.priority : 0)));
-    meta.appendChild(lineMeta("过期时间", fmtTime(c.expires_at)));
+    meta.appendChild(lineMeta("ID", shortId(c.id)));
+    meta.appendChild(lineMeta("Priority", String(c.priority != null ? c.priority : 0)));
+    meta.appendChild(lineMeta("Expires at", fmtTime(c.expires_at)));
     meta.appendChild(
       lineMeta(
-        "出站代理",
-        c.proxy_mode === "url" ? c.proxy_url || "已配置" : c.proxy_mode === "direct" ? "直连" : "继承全局"
+        "Outbound proxy",
+        c.proxy_mode === "url" ? c.proxy_url || "Configured" : c.proxy_mode === "direct" ? "Direct" : "Inherit global"
       )
     );
-    if (c.disable_reason) meta.appendChild(lineMeta("停用原因", c.disable_reason));
-    if (c.quarantined_at) meta.appendChild(lineMeta("隔离时间", fmtTime(c.quarantined_at)));
+    if (c.disable_reason) meta.appendChild(lineMeta("Disable reason", c.disable_reason));
+    if (c.quarantined_at) meta.appendChild(lineMeta("Quarantined at", fmtTime(c.quarantined_at)));
     meta.appendChild(
       lineMeta(
-        "令牌",
-        (c.has_access_token ? "访问令牌" : "—") +
+        "Tokens",
+        (c.has_access_token ? "Access token" : "\u2014") +
           " / " +
-          (c.has_refresh_token ? "刷新令牌" : "—")
+          (c.has_refresh_token ? "Refresh token" : "\u2014")
       )
     );
     if (c.failure_count) {
-      meta.appendChild(lineMeta("失败次数", String(c.failure_count)));
+      meta.appendChild(lineMeta("Failure count", String(c.failure_count)));
     }
     if (c.last_error) {
       var errLine = el("div");
-      errLine.appendChild(el("span", "badge badge-danger", "错误"));
+      errLine.appendChild(el("span", "badge badge-danger", "Error"));
       errLine.appendChild(document.createTextNode(" "));
       errLine.appendChild(el("span", "", c.last_error));
       meta.appendChild(errLine);
     }
     if (c.cooldown_until) {
-      meta.appendChild(lineMeta("冷却至", fmtTime(c.cooldown_until)));
+      meta.appendChild(lineMeta("Cool-down until", fmtTime(c.cooldown_until)));
     }
     if (c.last_inspection_at || c.last_inspection_status || c.last_inspection_error) {
-      meta.appendChild(lineMeta("最近巡检", fmtTime(c.last_inspection_at)));
-      meta.appendChild(lineMeta("巡检结果", inspectionStatusText(c.last_inspection_status)));
+      meta.appendChild(lineMeta("Last inspection", fmtTime(c.last_inspection_at)));
+      meta.appendChild(lineMeta("Inspection result", inspectionStatusText(c.last_inspection_status)));
       if (c.last_inspection_error) {
-        meta.appendChild(lineMeta("巡检详情", c.last_inspection_error));
+        meta.appendChild(lineMeta("Inspection details", c.last_inspection_error));
       }
     }
     if (c.access_token) {
-      meta.appendChild(lineMeta("访问令牌(脱敏)", c.access_token));
+      meta.appendChild(lineMeta("Access token (masked)", c.access_token));
     }
     var usageBox = el("div", "usage-box");
-    usageBox.appendChild(el("div", "muted", "额度加载中…"));
+    usageBox.appendChild(el("div", "muted", "Loading quota\u2026"));
     meta.appendChild(usageBox);
     card.appendChild(meta);
     // Async fill usage summary on each card (no raw JSON).
     fillCredentialUsage(usageBox, c.id);
 
     var prioRow = el("div", "priority-row");
-    prioRow.appendChild(el("span", "label", "优先级"));
+    prioRow.appendChild(el("span", "label", "Priority"));
     var prioInput = el("input");
     prioInput.type = "number";
     prioInput.value = String(c.priority != null ? c.priority : 0);
-    prioInput.setAttribute("aria-label", "优先级");
-    var prioBtn = el("button", "btn btn-sm", "保存");
+    prioInput.setAttribute("aria-label", "Priority");
+    var prioBtn = el("button", "btn btn-sm", "Save");
     prioBtn.type = "button";
     prioBtn.addEventListener("click", function () {
       var n = parseInt(prioInput.value, 10);
       if (isNaN(n)) {
-        toast("优先级必须是数字", "err");
+        toast("Priority must be a number", "err");
         return;
       }
       prioBtn.disabled = true;
@@ -395,11 +395,11 @@
         priority: n,
       })
         .then(function () {
-          toast("优先级已更新", "ok");
+          toast("Priority updated", "ok");
           loadCredentials();
         })
         .catch(function (err) {
-          toast("更新失败: " + err.message, "err");
+          toast("Update failed: " + err.message, "err");
         })
         .finally(function () {
           prioBtn.disabled = false;
@@ -411,7 +411,7 @@
 
     var actions = el("div", "cred-actions");
 
-    var toggle = el("button", "btn btn-sm", c.enabled ? "禁用" : "启用");
+    var toggle = el("button", "btn btn-sm", c.enabled ? "Disable" : "Enable");
     toggle.type = "button";
     toggle.addEventListener("click", function () {
       toggle.disabled = true;
@@ -420,11 +420,11 @@
         enabled: !c.enabled,
       })
         .then(function () {
-          toast(c.enabled ? "已禁用" : "已启用", "ok");
+          toast(c.enabled ? "Disabled" : "Enabled", "ok");
           loadCredentials();
         })
         .catch(function (err) {
-          toast("切换失败: " + err.message, "err");
+          toast("Toggle failed: " + err.message, "err");
         })
         .finally(function () {
           toggle.disabled = false;
@@ -432,17 +432,17 @@
     });
     actions.appendChild(toggle);
 
-    var refresh = el("button", "btn btn-sm", "刷新令牌");
+    var refresh = el("button", "btn btn-sm", "Refresh token");
     refresh.type = "button";
     refresh.addEventListener("click", function () {
       refresh.disabled = true;
       api("POST", "/admin/credentials/" + encodeURIComponent(c.id) + "/refresh")
         .then(function () {
-          toast("令牌已刷新", "ok");
+          toast("Token refreshed", "ok");
           loadCredentials();
         })
         .catch(function (err) {
-          toast("刷新令牌失败: " + err.message, "err");
+          toast("Failed to refresh token: " + err.message, "err");
         })
         .finally(function () {
           refresh.disabled = false;
@@ -450,32 +450,32 @@
     });
     actions.appendChild(refresh);
 
-    var proxyBtn = el("button", "btn btn-sm", "代理");
+    var proxyBtn = el("button", "btn btn-sm", "Proxy");
     proxyBtn.type = "button";
     proxyBtn.addEventListener("click", function () {
       showCredentialProxy(c);
     });
     actions.appendChild(proxyBtn);
 
-    var billing = el("button", "btn btn-sm", "账单");
+    var billing = el("button", "btn btn-sm", "Billing");
     billing.type = "button";
     billing.addEventListener("click", function () {
       showBilling(c);
     });
     actions.appendChild(billing);
 
-    var del = el("button", "btn btn-sm btn-danger", "删除");
+    var del = el("button", "btn btn-sm btn-danger", "Delete");
     del.type = "button";
     del.addEventListener("click", function () {
-      if (!confirm("确认删除凭证 " + (c.name || c.id) + " ?")) return;
+      if (!confirm("Confirm delete credential " + (c.name || c.id) + " ?")) return;
       del.disabled = true;
       api("DELETE", "/admin/credentials/" + encodeURIComponent(c.id))
         .then(function () {
-          toast("已删除", "ok");
+          toast("Deleted", "ok");
           loadCredentials();
         })
         .catch(function (err) {
-          toast("删除失败: " + err.message, "err");
+          toast("Delete failed: " + err.message, "err");
         })
         .finally(function () {
           del.disabled = false;
@@ -490,12 +490,12 @@
   function showCredentialProxy(c) {
     var body = el("div", "stack");
     var modeField = el("label", "field");
-    modeField.appendChild(el("span", "label", "代理模式"));
+    modeField.appendChild(el("span", "label", "Proxy mode"));
     var mode = el("select");
     [
-      ["inherit", "继承全局"],
-      ["direct", "强制直连"],
-      ["url", "自定义代理 URL"],
+      ["inherit", "Inherit global"],
+      ["direct", "Force direct"],
+      ["url", "Custom proxy URL"],
     ].forEach(function (value) {
       var option = el("option", "", value[1]);
       option.value = value[0];
@@ -505,27 +505,27 @@
     modeField.appendChild(mode);
     body.appendChild(modeField);
     var urlField = el("label", "field");
-    urlField.appendChild(el("span", "label", "代理 URL"));
+    urlField.appendChild(el("span", "label", "Proxy URL"));
     var proxyURL = el("input");
     proxyURL.type = "password";
-    proxyURL.placeholder = "http://user:pass@host:port 或 socks5h://host:port";
+    proxyURL.placeholder = "http://user:pass@host:port or socks5h://host:port";
     urlField.appendChild(proxyURL);
     body.appendChild(urlField);
-    body.appendChild(el("p", "muted", "现有代理密码不会回显；切换为自定义 URL 时需重新完整输入。"));
+    body.appendChild(el("p", "muted", "Existing proxy password is not shown; when switching to a custom URL, you will need to re-enter it completely."));
     function sync() {
       proxyURL.disabled = mode.value !== "url";
     }
     mode.addEventListener("change", sync);
     sync();
 
-    var cancel = el("button", "btn", "取消");
+    var cancel = el("button", "btn", "Cancel");
     cancel.type = "button";
     cancel.addEventListener("click", closeModal);
-    var save = el("button", "btn btn-primary", "保存");
+    var save = el("button", "btn btn-primary", "Save");
     save.type = "button";
     save.addEventListener("click", function () {
       if (mode.value === "url" && !(proxyURL.value || "").trim()) {
-        toast("请输入完整代理 URL", "err");
+        toast("Please enter a complete proxy URL", "err");
         return;
       }
       save.disabled = true;
@@ -535,18 +535,18 @@
       })
         .then(function () {
           proxyURL.value = "";
-          toast("凭证代理已更新", "ok");
+          toast("Credential proxy updated", "ok");
           closeModal();
           loadCredentials();
         })
         .catch(function (err) {
-          toast("代理设置失败: " + err.message, "err");
+          toast("Proxy settings failed: " + err.message, "err");
         })
         .finally(function () {
           save.disabled = false;
         });
     });
-    openModal("凭证代理 · " + (c.name || c.email || shortId(c.id)), body, [cancel, save]);
+    openModal("Credential Proxy \u00b7 " + (c.name || c.email || shortId(c.id)), body, [cancel, save]);
   }
 
   function lineMeta(label, value) {
@@ -558,20 +558,20 @@
 
   function showBilling(c) {
     var body = el("div", "stack");
-    body.appendChild(el("p", "muted", "加载账单…"));
-    var closeBtn = el("button", "btn", "关闭");
+    body.appendChild(el("p", "muted", "Loading billing\u2026"));
+    var closeBtn = el("button", "btn", "Close");
     closeBtn.type = "button";
     closeBtn.addEventListener("click", closeModal);
-    var reloadBtn = el("button", "btn btn-primary", "刷新");
+    var reloadBtn = el("button", "btn btn-primary", "Refresh");
     reloadBtn.type = "button";
-    openModal("账单 · " + (c.name || c.email || shortId(c.id)), body, [
+    openModal("Billing \u00b7 " + (c.name || c.email || shortId(c.id)), body, [
       reloadBtn,
       closeBtn,
     ]);
 
     function load() {
       clear(body);
-      body.appendChild(el("p", "muted", "加载账单…"));
+      body.appendChild(el("p", "muted", "Loading billing\u2026"));
       reloadBtn.disabled = true;
       api("GET", "/admin/credentials/" + encodeURIComponent(c.id) + "/billing")
         .then(function (snap) {
@@ -579,7 +579,7 @@
           body.appendChild(renderBillingDashboard(snap));
           // Raw JSON is optional debug only — collapsed by default.
           var details = el("details", "raw-details");
-          var summary = el("summary", "", "调试：原始 JSON（默认折叠）");
+          var summary = el("summary", "", "Debug: Raw JSON (collapsed by default)");
           details.appendChild(summary);
           var pre = el("pre", "code");
           pre.textContent = JSON.stringify(snap, null, 2);
@@ -588,7 +588,7 @@
         })
         .catch(function (err) {
           clear(body);
-          body.appendChild(el("p", "error", err.message || "账单加载失败"));
+          body.appendChild(el("p", "error", err.message || "Failed to load billing"));
         })
         .finally(function () {
           reloadBtn.disabled = false;
@@ -605,19 +605,19 @@
         clear(box);
         var build = (snap && snap.grok_build) || {};
         if (!build.reported || build.shared_weekly_usage_percent == null) {
-          box.appendChild(usageBar("Grok Build", 0, "未报告", "neutral"));
+          box.appendChild(usageBar("Grok Build", 0, "Not reported", "neutral"));
           return;
         }
         var pct = num(build.shared_weekly_usage_percent);
-        var label = "共享周额度已用 " + pct.toFixed(1) + "%";
+        var label = "Shared weekly quota used " + pct.toFixed(1) + "%";
         if (build.grok_build_contribution_percent != null) {
-          label += " · Build 贡献 " + num(build.grok_build_contribution_percent).toFixed(1) + "%";
+          label += " \u00b7 Build contribution " + num(build.grok_build_contribution_percent).toFixed(1) + "%";
         }
         box.appendChild(usageBar("Grok Build", pct, label, toneFromPct(pct)));
       })
       .catch(function (err) {
         clear(box);
-        box.appendChild(el("div", "error", "额度: " + (err.message || "失败")));
+        box.appendChild(el("div", "error", "Quota: " + (err.message || "Failed")));
       });
   }
 
@@ -637,18 +637,18 @@
       weekPct: weekPct,
       monthLabel:
         limit != null && limit > 0 && used != null
-          ? fmtNum(used) + " / " + fmtNum(limit) + "（剩 " + fmtNum(rem) + "）"
+          ? fmtNum(used) + " / " + fmtNum(limit) + " (remaining " + fmtNum(rem) + ")"
           : used != null
-            ? "已用 " + fmtNum(used) + "（无限额字段）"
-            : "未报告",
-      weekLabel: weekPct != null ? weekPct.toFixed(1) + "%" : "未报告",
+            ? "Used " + fmtNum(used) + " (no limit field)"
+            : "Not reported",
+      weekLabel: weekPct != null ? weekPct.toFixed(1) + "%" : "Not reported",
       monthTone: monthPct != null ? toneFromPct(monthPct) : "neutral",
       weekTone: weekPct != null ? toneFromPct(weekPct) : "neutral",
       period:
         (m.billingPeriodStart || "") && (m.billingPeriodEnd || "")
-          ? fmtDay(m.billingPeriodStart) + " → " + fmtDay(m.billingPeriodEnd)
+          ? fmtDay(m.billingPeriodStart) + " \u2192 " + fmtDay(m.billingPeriodEnd)
           : m.billingPeriodEnd
-            ? "至 " + fmtDay(m.billingPeriodEnd)
+            ? "Until " + fmtDay(m.billingPeriodEnd)
             : "",
       weekEnd: w.billingPeriodEnd ? fmtDay(w.billingPeriodEnd) : "",
       products: parseProductUsage(w.productUsage),
@@ -681,14 +681,14 @@
     var wrap = el("div", "stack billing-dash");
 
     var hero = el("div", "billing-hero");
-    hero.appendChild(el("div", "billing-hero-title", "Grok Build 额度"));
+    hero.appendChild(el("div", "billing-hero-title", "Grok Build Quota"));
     hero.appendChild(
       el(
         "div",
         "billing-hero-value",
         build.reported && build.shared_weekly_usage_percent != null
-          ? num(build.shared_weekly_usage_percent).toFixed(1) + "% 已用"
-          : "未报告"
+          ? num(build.shared_weekly_usage_percent).toFixed(1) + "% used"
+          : "Not reported"
       )
     );
     hero.appendChild(
@@ -696,59 +696,59 @@
         "div",
         "muted",
         build.grok_build_contribution_percent != null
-          ? "Grok Build 对共享周额度池的消耗贡献 " + num(build.grok_build_contribution_percent).toFixed(1) + "%（不是独立上限）"
-          : "共享周额度；上游未单独报告 Grok Build 消耗贡献"
+          ? "Grok Build's consumption contribution to the shared weekly quota pool " + num(build.grok_build_contribution_percent).toFixed(1) + "% (not an independent limit)"
+          : "Shared weekly quota; upstream does not separately report Grok Build consumption contribution"
       )
     );
     wrap.appendChild(hero);
 
     if (build.reported && build.shared_weekly_usage_percent != null) {
-      wrap.appendChild(usageBar("共享周额度", num(build.shared_weekly_usage_percent), num(build.shared_weekly_usage_percent).toFixed(1) + "%", toneFromPct(num(build.shared_weekly_usage_percent))));
+      wrap.appendChild(usageBar("Shared weekly quota", num(build.shared_weekly_usage_percent), num(build.shared_weekly_usage_percent).toFixed(1) + "%", toneFromPct(num(build.shared_weekly_usage_percent))));
     }
 
     var diagnostics = el("details", "raw-details");
-    diagnostics.appendChild(el("summary", "", "诊断：月度/API 与产品明细"));
+    diagnostics.appendChild(el("summary", "", "Diagnostics: Monthly/API & Product Details"));
     var grid = el("div", "billing-grid");
-    grid.appendChild(statCard("月已用", u.used != null ? fmtNum(u.used) : "未报告"));
-    grid.appendChild(statCard("月上限", u.limit != null ? fmtNum(u.limit) : "未报告"));
-    grid.appendChild(statCard("月剩余", u.rem != null ? fmtNum(u.rem) : "未报告"));
-    grid.appendChild(statCard("周用量", u.weekPct != null ? u.weekPct.toFixed(1) + "%" : "未报告"));
+    grid.appendChild(statCard("Monthly used", u.used != null ? fmtNum(u.used) : "Not reported"));
+    grid.appendChild(statCard("Monthly limit", u.limit != null ? fmtNum(u.limit) : "Not reported"));
+    grid.appendChild(statCard("Monthly remaining", u.rem != null ? fmtNum(u.rem) : "Not reported"));
+    grid.appendChild(statCard("Weekly usage", u.weekPct != null ? u.weekPct.toFixed(1) + "%" : "Not reported"));
     diagnostics.appendChild(grid);
 
     if (u.period) {
-      diagnostics.appendChild(lineMeta("月账期", u.period));
+      diagnostics.appendChild(lineMeta("Monthly billing period", u.period));
     }
     if (u.weekEnd) {
-      diagnostics.appendChild(lineMeta("周账期结束", u.weekEnd));
+      diagnostics.appendChild(lineMeta("Weekly billing period ends", u.weekEnd));
     }
 
     if (u.products.length) {
-      diagnostics.appendChild(el("div", "section-label", "产品用量"));
+      diagnostics.appendChild(el("div", "section-label", "Product usage"));
       u.products.forEach(function (p) {
         diagnostics.appendChild(
           usageBar(
             p.name,
             p.pct != null ? p.pct : 0,
-            p.pct != null ? p.pct.toFixed(1) + "%" : "未报告",
+            p.pct != null ? p.pct.toFixed(1) + "%" : "Not reported",
             p.pct != null ? toneFromPct(p.pct) : "neutral"
           )
         );
       });
     }
-	if (snap && snap.monthly_error) diagnostics.appendChild(el("p", "error", "月度接口: " + snap.monthly_error));
-	if (snap && snap.weekly_error) diagnostics.appendChild(el("p", "error", "周额度接口: " + snap.weekly_error));
+	if (snap && snap.monthly_error) diagnostics.appendChild(el("p", "error", "Monthly API: " + snap.monthly_error));
+	if (snap && snap.weekly_error) diagnostics.appendChild(el("p", "error", "Weekly quota API: " + snap.weekly_error));
 	wrap.appendChild(diagnostics);
 
     if (!build.reported) {
       wrap.appendChild(
-        el("p", "muted", "Grok Build 共享周额度：未报告。月度/API 数据仍可在诊断区查看。")
+        el("p", "muted", "Grok Build shared weekly quota: not reported. Monthly/API data is still available in the diagnostics section.")
       );
     } else if (num(build.shared_weekly_usage_percent) >= 100) {
       wrap.appendChild(
-        el("p", "error", "周额度已用尽（上游可能返回 402 账单错误）。")
+        el("p", "error", "Weekly quota exhausted (upstream may return 402 billing error).")
       );
     } else if (u.monthPct != null && u.monthPct >= 95) {
-      wrap.appendChild(el("p", "error", "月额度即将用尽，请留意切换账号。"));
+      wrap.appendChild(el("p", "error", "Monthly quota nearly exhausted. Consider switching accounts."));
     }
 
     return wrap;
@@ -790,7 +790,7 @@
   function fmtNum(n) {
     n = num(n);
     try {
-      return n.toLocaleString("zh-CN", { maximumFractionDigits: 1 });
+      return n.toLocaleString("en-US", { maximumFractionDigits: 1 });
     } catch (_) {
       return String(n);
     }
@@ -816,11 +816,11 @@
     api("POST", "/admin/credentials/import-grok", {})
       .then(function (data) {
         var n = (data && data.imported) || 0;
-        toast("已导入 " + n + " 条凭证", "ok");
+        toast("Imported " + n + " credentials", "ok");
         loadCredentials();
       })
       .catch(function (err) {
-        toast("导入失败: " + err.message, "err");
+        toast("Import failed: " + err.message, "err");
       });
   }
 
@@ -828,21 +828,21 @@
     api("POST", "/admin/oauth/device/start", {})
       .then(function (data) {
         var body = el("div", "stack");
-        body.appendChild(el("p", "muted", "在 xAI 页面完成授权，此窗口会自动检测结果。"));
+        body.appendChild(el("p", "muted", "Complete authorization on the xAI page. This window will automatically detect the result."));
         var code = el("code", "code-block", data.user_code || "");
         body.appendChild(code);
-        var link = el("a", "btn btn-primary", "打开授权页面");
+        var link = el("a", "btn btn-primary", "Open authorization page");
         link.href = data.verification_uri_complete || data.verification_uri || "#";
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         body.appendChild(link);
-        var status = el("p", "muted", "等待授权…");
+        var status = el("p", "muted", "Waiting for authorization\u2026");
         status.id = "device-login-status";
         body.appendChild(status);
-        var cancel = el("button", "btn", "取消");
+        var cancel = el("button", "btn", "Cancel");
         cancel.type = "button";
         cancel.addEventListener("click", closeModal);
-        openModal("浏览器登录", body, [cancel]);
+        openModal("Browser Login", body, [cancel]);
 
         var interval = Math.max(1, Number(data.interval) || 5) * 1000;
         function poll() {
@@ -850,12 +850,12 @@
           api("POST", "/admin/oauth/device/poll", { session_id: data.session_id })
             .then(function (result) {
               if (result && result.status === "authorized") {
-                toast("账号授权成功", "ok");
+                toast("Account authorized successfully", "ok");
                 closeModal();
                 loadCredentials();
                 return;
               }
-              setText($("device-login-status"), "等待授权…");
+              setText($("device-login-status"), "Waiting for authorization\u2026");
               var delay = Math.max(1, Number(result && result.retry_after) || interval / 1000) * 1000;
               setTimeout(poll, delay);
             })
@@ -865,13 +865,13 @@
                 setTimeout(poll, Math.max(1, retry) * 1000);
                 return;
               }
-              setText($("device-login-status"), "授权失败: " + err.message);
+              setText($("device-login-status"), "Authorization failed: " + err.message);
             });
         }
         setTimeout(poll, interval);
       })
       .catch(function (err) {
-        toast("启动浏览器登录失败: " + err.message, "err");
+        toast("Failed to start browser login: " + err.message, "err");
       });
   }
 
@@ -881,16 +881,16 @@
       el(
         "p",
         "muted",
-        "上传多个 Grok / CPA JSON 或 SSO 文件，也可直接粘贴内容。原始文本会直接发送，重复 JSON 顶层名称不会在浏览器中被覆盖。"
+        "Upload multiple Grok / CPA JSON or SSO files, or paste content directly. Raw text is sent as-is; duplicate JSON top-level names will not be overwritten in the browser."
       )
     );
     var formatField = el("label", "field");
-    formatField.appendChild(el("span", "label", "内容类型"));
+    formatField.appendChild(el("span", "label", "Content type"));
     var format = el("select");
     [
-      ["auto", "自动识别"],
+      ["auto", "Auto-detect"],
       ["json", "Grok / CPA JSON"],
-      ["sso", "SSO 文本 / JSON"],
+      ["sso", "SSO text / JSON"],
     ].forEach(function (option) {
       var node = el("option", "", option[1]);
       node.value = option[0];
@@ -900,7 +900,7 @@
     body.appendChild(formatField);
 
     var fileField = el("label", "field");
-    fileField.appendChild(el("span", "label", "选择文件（可多选）"));
+    fileField.appendChild(el("span", "label", "Select files (multiple allowed)"));
     var fileInput = el("input");
     fileInput.type = "file";
     fileInput.multiple = true;
@@ -908,9 +908,9 @@
     fileField.appendChild(fileInput);
     body.appendChild(fileField);
 
-    body.appendChild(el("div", "muted", "或粘贴内容"));
+    body.appendChild(el("div", "muted", "Or paste content"));
     var ta = el("textarea");
-    ta.placeholder = "auth.json / CPA xAI JSON / 每行一个 SSO";
+    ta.placeholder = "auth.json / CPA xAI JSON / one SSO per line";
     body.appendChild(ta);
     var status = el("div", "muted");
     body.appendChild(status);
@@ -918,21 +918,21 @@
     importDetails.style.display = "none";
     body.appendChild(importDetails);
 
-    var cancel = el("button", "btn", "取消");
+    var cancel = el("button", "btn", "Cancel");
     cancel.type = "button";
     cancel.addEventListener("click", closeModal);
 
-    var ok = el("button", "btn btn-primary", "导入");
+    var ok = el("button", "btn btn-primary", "Import");
     ok.type = "button";
     ok.addEventListener("click", function () {
       var rawText = (ta.value || "").trim();
       var selected = fileInput.files || [];
       if (!rawText && !selected.length) {
-        toast("请选择文件或粘贴内容", "err");
+        toast("Please select files or paste content", "err");
         return;
       }
       ok.disabled = true;
-      setText(status, "正在创建导入任务…");
+      setText(status, "Creating import job\u2026");
       var request;
       if (selected.length) {
         var form = new FormData();
@@ -951,31 +951,31 @@
       }
       request
         .then(function (job) {
-          setText(status, "任务已创建，正在解析与写入…");
+          setText(status, "Job created, parsing and writing\u2026");
           return pollImportJob(job.id, status, importDetails);
         })
         .then(function (job) {
           var imported = num(job.created) + num(job.updated);
           var message =
-            "导入完成：" + imported + " 条（新增 " + num(job.created) + "，更新 " + num(job.updated) +
-            "，跳过 " + num(job.skipped) + "）";
-          if (job.failed) message += "，失败 " + job.failed;
-          if (job.warning_count) message += "，警告 " + job.warning_count;
+            "Import complete: " + imported + " entries (created " + num(job.created) + ", updated " + num(job.updated) +
+            ", skipped " + num(job.skipped) + ")";
+          if (job.failed) message += ", failed " + job.failed;
+          if (job.warning_count) message += ", warnings " + job.warning_count;
           toast(message, job.failed ? "err" : "ok");
           ta.value = "";
           fileInput.value = "";
           loadCredentials();
         })
         .catch(function (err) {
-          toast("导入失败: " + err.message, "err");
-          setText(status, "导入失败: " + err.message);
+          toast("Import failed: " + err.message, "err");
+          setText(status, "Import failed: " + err.message);
         })
         .finally(function () {
           ok.disabled = false;
         });
     });
 
-    openModal("批量导入凭证", body, [cancel, ok]);
+    openModal("Batch import credentials", body, [cancel, ok]);
   }
 
   function pollImportJob(id, statusNode, detailsNode) {
@@ -985,18 +985,18 @@
           .then(function (job) {
             setText(
               statusNode,
-              "状态：" + (job.status || "unknown") +
-                " · 文件 " + num(job.files_processed) + "/" + num(job.files_total) +
-                " · 条目 " + num(job.processed) + "/" + num(job.total) +
-                " · 新增 " + num(job.created) +
-                " · 更新 " + num(job.updated) +
-                " · 跳过 " + num(job.skipped) +
-                " · 失败 " + num(job.failed)
+              "Status: " + (job.status || "unknown") +
+                " \u00b7 Files " + num(job.files_processed) + "/" + num(job.files_total) +
+                " \u00b7 Entries " + num(job.processed) + "/" + num(job.total) +
+                " \u00b7 Created " + num(job.created) +
+                " \u00b7 Updated " + num(job.updated) +
+                " \u00b7 Skipped " + num(job.skipped) +
+                " \u00b7 Failed " + num(job.failed)
             );
             renderImportJobDetails(job, detailsNode);
             if (job.status === "completed" || job.status === "partial" || job.status === "failed") {
               if (job.status === "failed" && !job.created && !job.updated) {
-                var detail = job.error || ((job.results || [])[0] || {}).error || "导入任务失败";
+                var detail = job.error || ((job.results || [])[0] || {}).error || "Import job failed";
                 reject(new Error(detail));
                 return;
               }
@@ -1016,18 +1016,18 @@
     var lines = [];
     (job.files || []).forEach(function (file) {
       lines.push(
-        (file.source || "file") + " · " + (file.name || "未命名") + " · " + (file.status || "unknown") +
-          " · " + num(file.processed) + "/" + num(file.total)
+        (file.source || "file") + " \u00b7 " + (file.name || "(unnamed)") + " \u00b7 " + (file.status || "unknown") +
+          " \u00b7 " + num(file.processed) + "/" + num(file.total)
       );
       (file.warnings || []).forEach(function (warning) {
-        lines.push("  警告 [" + (warning.field || "unknown") + "] " + (warning.message || ""));
+        lines.push("  Warning [" + (warning.field || "unknown") + "] " + (warning.message || ""));
       });
       (file.results || []).forEach(function (result) {
-        var line = "  " + (result.source || "entry") + " · " + (result.status || "unknown");
-        if (result.error) line += " · " + result.error;
+        var line = "  " + (result.source || "entry") + " \u00b7 " + (result.status || "unknown");
+        if (result.error) line += " \u00b7 " + result.error;
         lines.push(line);
         (result.warnings || []).forEach(function (warning) {
-          lines.push("    警告 [" + (warning.field || "unknown") + "] " + (warning.message || ""));
+          lines.push("    Warning [" + (warning.field || "unknown") + "] " + (warning.message || ""));
         });
       });
     });
@@ -1055,7 +1055,7 @@
         wrap.appendChild(renderClientTable(clients));
       })
       .catch(function (err) {
-        toast("加载客户端失败: " + err.message, "err");
+        toast("Failed to load clients: " + err.message, "err");
       });
   }
 
@@ -1063,7 +1063,7 @@
     var table = el("table");
     var thead = el("thead");
     var hr = el("tr");
-    ["名称", "编号", "前缀", "创建时间", "状态", ""].forEach(function (h) {
+    ["Name", "ID", "Prefix", "Created at", "Status", ""].forEach(function (h) {
       hr.appendChild(el("th", "", h));
     });
     thead.appendChild(hr);
@@ -1072,12 +1072,12 @@
     var tbody = el("tbody");
     clients.forEach(function (c) {
       var tr = el("tr");
-      tr.appendChild(el("td", "", c.name || "—"));
+      tr.appendChild(el("td", "", c.name || "\u2014"));
       var idTd = el("td");
       idTd.appendChild(el("code", "", shortId(c.id)));
       tr.appendChild(idTd);
       var prefTd = el("td");
-      prefTd.appendChild(el("code", "", c.prefix || "—"));
+      prefTd.appendChild(el("code", "", c.prefix || "\u2014"));
       tr.appendChild(prefTd);
       tr.appendChild(el("td", "", fmtTime(c.created_at)));
       var st = el("td");
@@ -1085,24 +1085,24 @@
         el(
           "span",
           "badge " + (c.disabled ? "badge-off" : "badge-ok"),
-          c.disabled ? "已停用" : "可用"
+          c.disabled ? "Disabled" : "Active"
         )
       );
       tr.appendChild(st);
 
       var act = el("td");
-      var del = el("button", "btn btn-sm btn-danger", "删除");
+      var del = el("button", "btn btn-sm btn-danger", "Delete");
       del.type = "button";
       del.addEventListener("click", function () {
-        if (!confirm("确认吊销客户端密钥 " + (c.name || c.id) + " ？")) return;
+        if (!confirm("Confirm revoke client key " + (c.name || c.id) + " ?")) return;
         del.disabled = true;
         api("DELETE", "/admin/clients/" + encodeURIComponent(c.id))
           .then(function () {
-            toast("已删除客户端密钥", "ok");
+            toast("Client key deleted", "ok");
             loadClients();
           })
           .catch(function (err) {
-            toast("删除失败: " + err.message, "err");
+            toast("Delete failed: " + err.message, "err");
           })
           .finally(function () {
             del.disabled = false;
@@ -1119,18 +1119,18 @@
   function openCreateClientModal() {
     var body = el("div", "stack");
     var field = el("label", "field");
-    field.appendChild(el("span", "label", "名称（可选）"));
+    field.appendChild(el("span", "label", "Name (optional)"));
     var input = el("input");
     input.type = "text";
-    input.placeholder = "例如：claude-code-本机";
+    input.placeholder = "e.g. claude-code-local";
     field.appendChild(input);
     body.appendChild(field);
 
-    var cancel = el("button", "btn", "取消");
+    var cancel = el("button", "btn", "Cancel");
     cancel.type = "button";
     cancel.addEventListener("click", closeModal);
 
-    var ok = el("button", "btn btn-primary", "创建");
+    var ok = el("button", "btn btn-primary", "Create");
     ok.type = "button";
     ok.addEventListener("click", function () {
       ok.disabled = true;
@@ -1141,14 +1141,14 @@
           loadClients();
         })
         .catch(function (err) {
-          toast("创建失败: " + err.message, "err");
+          toast("Create failed: " + err.message, "err");
         })
         .finally(function () {
           ok.disabled = false;
         });
     });
 
-    openModal("创建客户端密钥", body, [cancel, ok]);
+    openModal("Create Client Key", body, [cancel, ok]);
   }
 
   function showOncePlaintext(plain, client) {
@@ -1157,30 +1157,30 @@
       el(
         "div",
         "warn-note",
-        "明文 API Key 仅此一次展示，关闭后无法再次查看。请立即复制保存。"
+        "The plaintext API Key is shown only once and cannot be viewed again after closing. Please copy and save it now."
       )
     );
     if (client && client.name) {
-      body.appendChild(el("div", "muted", "名称: " + client.name));
+      body.appendChild(el("div", "muted", "Name: " + client.name));
     }
-    body.appendChild(el("div", "plaintext-box", plain || "（空）"));
+    body.appendChild(el("div", "plaintext-box", plain || "(empty)"));
 
-    var copy = el("button", "btn btn-primary", "复制");
+    var copy = el("button", "btn btn-primary", "Copy");
     copy.type = "button";
     copy.addEventListener("click", function () {
       copyText(plain).then(
         function () {
-          toast("已复制", "ok");
+          toast("Copied", "ok");
         },
         function () {
-          toast("复制失败，请手动选择", "err");
+          toast("Copy failed, please select manually", "err");
         }
       );
     });
-    var close = el("button", "btn", "我已保存");
+    var close = el("button", "btn", "I have saved it");
     close.type = "button";
     close.addEventListener("click", closeModal);
-    openModal("客户端密钥", body, [copy, close]);
+    openModal("Client Key", body, [copy, close]);
   }
 
   // ---------- Runtime settings ----------
@@ -1189,7 +1189,7 @@
     var host = $("settings-body");
     if (!host) return;
     clear(host);
-    host.appendChild(el("p", "muted", "加载运行设置…"));
+    host.appendChild(el("p", "muted", "Loading runtime settings\u2026"));
     api("GET", "/admin/settings")
       .then(function (settings) {
         state.settings = settings;
@@ -1198,7 +1198,7 @@
       })
       .catch(function (err) {
         clear(host);
-        host.appendChild(el("p", "error", "设置加载失败: " + err.message));
+        host.appendChild(el("p", "error", "Failed to load settings: " + err.message));
       });
   }
 
@@ -1208,38 +1208,38 @@
     var converter = settings.sso_converter || {};
     var inspection = settings.inspection || {};
 
-    wrap.appendChild(el("h3", "", "全局出站代理"));
+    wrap.appendChild(el("h3", "", "Global Outbound Proxy"));
     var proxyMode = settingSelect(
-      "代理模式",
+      "Proxy mode",
       [
-        ["environment", "读取 HTTP(S)_PROXY 环境变量"],
-        ["direct", "强制直连"],
-        ["url", "固定代理 URL"],
+        ["environment", "Read HTTP(S)_PROXY environment variables"],
+        ["direct", "Force direct"],
+        ["url", "Fixed proxy URL"],
       ],
       globalProxy.mode || "environment"
     );
     wrap.appendChild(proxyMode.field);
-    if (globalProxy.url) wrap.appendChild(el("p", "muted", "当前：" + globalProxy.url));
+    if (globalProxy.url) wrap.appendChild(el("p", "muted", "Current: " + globalProxy.url));
     var proxyURL = settingInput(
-      "新代理 URL",
+      "New proxy URL",
       "password",
-      "http://user:pass@host:port 或 socks5h://host:port"
+      "http://user:pass@host:port or socks5h://host:port"
     );
     wrap.appendChild(proxyURL.field);
 
-    wrap.appendChild(el("h3", "", "SSO 转换服务"));
-    var converterEnabled = settingCheckbox("启用 SSO 文件转换", !!converter.enabled);
-    var converterEndpoint = settingInput("服务端点", "url", "https://converter.example");
+    wrap.appendChild(el("h3", "", "SSO Conversion Service"));
+    var converterEnabled = settingCheckbox("Enable SSO file conversion", !!converter.enabled);
+    var converterEndpoint = settingInput("Service endpoint", "url", "https://converter.example");
     converterEndpoint.input.value = converter.endpoint || "";
-    var converterKey = settingInput("API Key（留空保持不变）", "password", "转换服务 API Key");
-    var converterClear = settingCheckbox("清除已保存的 API Key", false);
+    var converterKey = settingInput("API Key (leave empty to keep current)", "password", "Conversion service API Key");
+    var converterClear = settingCheckbox("Clear saved API Key", false);
     var converterInsecure = settingCheckbox(
-      "允许明文 HTTP（仅可信容器网络）",
+      "Allow plain HTTP (trusted container network only)",
       !!converter.allow_insecure_http
     );
-    var converterTimeout = settingInput("转换超时（秒）", "number");
+    var converterTimeout = settingInput("Conversion timeout (seconds)", "number");
     converterTimeout.input.value = converter.timeout_sec || 600;
-    var converterBatch = settingInput("单批最大 SSO 数", "number");
+    var converterBatch = settingInput("Max SSO per batch", "number");
     converterBatch.input.value = converter.max_batch || 50;
     [
       converterEnabled,
@@ -1256,21 +1256,21 @@
       el(
         "p",
         "muted",
-        converter.api_key_configured ? "API Key 已配置（不会回显）" : "尚未配置 API Key"
+        converter.api_key_configured ? "API Key configured (will not be displayed)" : "No API Key configured"
       )
     );
 
-    wrap.appendChild(el("h3", "", "凭证自动巡检"));
-    var inspectEnabled = settingCheckbox("启用定时巡检", !!inspection.enabled);
-    var inspectInterval = settingInput("巡检间隔（秒）", "number");
+    wrap.appendChild(el("h3", "", "Automatic Credential Inspection"));
+    var inspectEnabled = settingCheckbox("Enable scheduled inspection", !!inspection.enabled);
+    var inspectInterval = settingInput("Inspection interval (seconds)", "number");
     inspectInterval.input.value = inspection.interval_sec || 3600;
-    var inspectTimeout = settingInput("单账号超时（秒）", "number");
+    var inspectTimeout = settingInput("Per-account timeout (seconds)", "number");
     inspectTimeout.input.value = inspection.timeout_sec || 30;
-    var inspectConcurrency = settingInput("并发数", "number");
+    var inspectConcurrency = settingInput("Concurrency", "number");
     inspectConcurrency.input.value = inspection.concurrency || 2;
-    var inspectConfirm = settingInput("连续 401 确认次数", "number");
+    var inspectConfirm = settingInput("Consecutive 401 confirm count", "number");
     inspectConfirm.input.value = inspection.confirm_unauthorized || 2;
-    var inspectPurge = settingInput("隔离后自动删除（秒，0 表示不删除）", "number");
+    var inspectPurge = settingInput("Auto-delete after quarantine (seconds, 0 = do not delete)", "number");
     inspectPurge.input.value = inspection.purge_after_sec || 0;
     [
       inspectEnabled,
@@ -1282,46 +1282,46 @@
     ].forEach(function (item) {
       wrap.appendChild(item.field);
     });
-    wrap.appendChild(el("p", "muted", "401 经刷新复核后隔离；429 只进入冷却，不会被判定为失效。"));
-    var inspectionStatus = el("p", "muted", "巡检状态加载中…");
+    wrap.appendChild(el("p", "muted", "401 after refresh review is quarantined; 429 only enters cool-down, not considered invalid."));
+    var inspectionStatus = el("p", "muted", "Loading inspection status\u2026");
     wrap.appendChild(inspectionStatus);
     api("GET", "/admin/inspection")
       .then(function (data) {
         if (data.running) {
-          setText(inspectionStatus, "巡检正在运行");
+          setText(inspectionStatus, "Inspection is running");
         } else if (data.has_run && data.last) {
           setText(
             inspectionStatus,
-            "上次巡检：" + fmtTime(data.last.finished_at) +
-              " · 正常 " + num(data.last.healthy) +
-              " · 隔离 " + num(data.last.quarantined) +
-              " · 429 " + num(data.last.rate_limited)
+            "Last inspection: " + fmtTime(data.last.finished_at) +
+              " \u00b7 Healthy " + num(data.last.healthy) +
+              " \u00b7 Quarantined " + num(data.last.quarantined) +
+              " \u00b7 429 " + num(data.last.rate_limited)
           );
         } else {
-          setText(inspectionStatus, "尚未执行巡检");
+          setText(inspectionStatus, "No inspection has been performed yet");
         }
       })
       .catch(function () {
-        setText(inspectionStatus, "巡检状态不可用");
+        setText(inspectionStatus, "Inspection status unavailable");
       });
-    var runInspection = el("button", "btn", "立即巡检");
+    var runInspection = el("button", "btn", "Run inspection now");
     runInspection.type = "button";
     runInspection.addEventListener("click", function () {
       runInspection.disabled = true;
-      setText(inspectionStatus, "正在巡检，请稍候…");
+      setText(inspectionStatus, "Inspecting, please wait\u2026");
       api("POST", "/admin/inspection/run")
         .then(function (summary) {
           setText(
             inspectionStatus,
-            "巡检完成：正常 " + num(summary.healthy) +
-              " · 隔离 " + num(summary.quarantined) +
-              " · 429 " + num(summary.rate_limited) +
-              (summary.mass_failure_guard ? " · 已触发批量故障保护" : "")
+            "Inspection complete: Healthy " + num(summary.healthy) +
+              " \u00b7 Quarantined " + num(summary.quarantined) +
+              " \u00b7 429 " + num(summary.rate_limited) +
+              (summary.mass_failure_guard ? " \u00b7 Mass failure guard triggered" : "")
           );
           loadCredentials();
         })
         .catch(function (err) {
-          setText(inspectionStatus, "巡检失败: " + err.message);
+          setText(inspectionStatus, "Inspection failed: " + err.message);
         })
         .finally(function () {
           runInspection.disabled = false;
@@ -1329,7 +1329,7 @@
     });
     wrap.appendChild(runInspection);
 
-    var save = el("button", "btn btn-primary", "保存运行设置");
+    var save = el("button", "btn btn-primary", "Save Runtime Settings");
     save.type = "button";
     save.addEventListener("click", function () {
       var payload = {};
@@ -1337,7 +1337,7 @@
       var nextURL = (proxyURL.input.value || "").trim();
       if (nextMode !== (globalProxy.mode || "environment") || nextURL) {
         if (nextMode === "url" && !nextURL) {
-          toast("切换固定代理时必须输入完整代理 URL", "err");
+          toast("You must enter a complete proxy URL when switching to a fixed proxy", "err");
           return;
         }
         payload.global_proxy = { mode: nextMode, url: nextURL };
@@ -1368,11 +1368,11 @@
         .then(function () {
           proxyURL.input.value = "";
           converterKey.input.value = "";
-          toast("运行设置已保存", "ok");
+          toast("Runtime settings saved", "ok");
           loadSettings();
         })
         .catch(function (err) {
-          toast("设置保存失败: " + err.message, "err");
+          toast("Failed to save settings: " + err.message, "err");
         })
         .finally(function () {
           save.disabled = false;
@@ -1422,56 +1422,56 @@
     var host = $("system-body");
     if (!host) return;
     clear(host);
-    host.appendChild(el("p", "muted", "加载中…"));
+    host.appendChild(el("p", "muted", "Loading\u2026"));
     api("GET", "/admin/system")
       .then(function (sys) {
         state.system = sys;
-        setText($("shell-version"), (sys && sys.version) || "管理后台");
+        setText($("shell-version"), (sys && sys.version) || "Admin Panel");
         clear(host);
         host.appendChild(renderSystem(sys));
       })
       .catch(function (err) {
         clear(host);
-        host.appendChild(el("p", "error", err.message || "加载失败"));
+        host.appendChild(el("p", "error", err.message || "Failed to load"));
       });
   }
 
   function renderSystem(sys) {
     var wrap = el("div", "stack");
     var dl = el("dl", "kv");
-    addKV(dl, "版本", sys.version);
-    addKV(dl, "监听地址", sys.listen);
-    addKV(dl, "数据目录", sys.data_dir);
-    addKV(dl, "对话后端", sys.chat_backend);
+    addKV(dl, "Version", sys.version);
+    addKV(dl, "Listen address", sys.listen);
+    addKV(dl, "Data directory", sys.data_dir);
+    addKV(dl, "Chat backend", sys.chat_backend);
     if (sys.upstream) {
-      addKV(dl, "上游地址", sys.upstream.base_url);
-      addKV(dl, "客户端版本", sys.upstream.client_version);
-      addKV(dl, "客户端标识", sys.upstream.client_identifier);
+      addKV(dl, "Upstream URL", sys.upstream.base_url);
+      addKV(dl, "Client version", sys.upstream.client_version);
+      addKV(dl, "Client identifier", sys.upstream.client_identifier);
       addKV(dl, "User-Agent", sys.upstream.user_agent);
-      addKV(dl, "Token 鉴权头", String(!!sys.upstream.token_auth));
+      addKV(dl, "Token auth header", String(!!sys.upstream.token_auth));
     }
     if (sys.anthropic) {
-      addKV(dl, "Anthropic 入口", sys.anthropic.enabled ? "已启用" : "已关闭");
+      addKV(dl, "Anthropic endpoint", sys.anthropic.enabled ? "Enabled" : "Disabled");
     }
     if (sys.pool) {
       var pool = sys.pool;
-      addKV(dl, "账号池可用", String(pool.available || 0) + " / " + String(pool.total || 0));
-      addKV(dl, "冷却中", pool.cooling || 0);
-      addKV(dl, "已禁用", pool.disabled || 0);
-      addKV(dl, "令牌已过期", pool.expired || 0);
-      addKV(dl, "下次恢复", pool.next_recovery_at ? fmtTime(pool.next_recovery_at) : "—");
-      addKV(dl, "最近成功", pool.last_success_at ? fmtTime(pool.last_success_at) : "—");
+      addKV(dl, "Account pool available", String(pool.available || 0) + " / " + String(pool.total || 0));
+      addKV(dl, "Cooling down", pool.cooling || 0);
+      addKV(dl, "Disabled", pool.disabled || 0);
+      addKV(dl, "Token expired", pool.expired || 0);
+      addKV(dl, "Next recovery", pool.next_recovery_at ? fmtTime(pool.next_recovery_at) : "\u2014");
+      addKV(dl, "Last success", pool.last_success_at ? fmtTime(pool.last_success_at) : "\u2014");
     }
     if (sys.limits) {
       var lim = sys.limits;
-      addKV(dl, "最大请求体", String(lim.MaxBodyBytes != null ? lim.MaxBodyBytes : lim.max_body_bytes || "—"));
-      addKV(dl, "请求超时(秒)", String(lim.RequestTimeoutSec != null ? lim.RequestTimeoutSec : lim.request_timeout_sec || "—"));
-      addKV(dl, "最大并发", String(lim.MaxConcurrent != null ? lim.MaxConcurrent : lim.max_concurrent || "—"));
+      addKV(dl, "Max request body", String(lim.MaxBodyBytes != null ? lim.MaxBodyBytes : lim.max_body_bytes || "\u2014"));
+      addKV(dl, "Request timeout (seconds)", String(lim.RequestTimeoutSec != null ? lim.RequestTimeoutSec : lim.request_timeout_sec || "\u2014"));
+      addKV(dl, "Max concurrency", String(lim.MaxConcurrent != null ? lim.MaxConcurrent : lim.max_concurrent || "\u2014"));
     }
     wrap.appendChild(dl);
 
     var raw = el("details");
-    raw.appendChild(el("summary", "", "调试：原始 JSON"));
+    raw.appendChild(el("summary", "", "Debug: Raw JSON"));
     var pre = el("pre", "code");
     pre.textContent = JSON.stringify(sys, null, 2);
     raw.appendChild(pre);
@@ -1481,7 +1481,7 @@
 
   function addKV(dl, k, v) {
     dl.appendChild(el("dt", "", k));
-    dl.appendChild(el("dd", "", v == null || v === "" ? "—" : String(v)));
+    dl.appendChild(el("dd", "", v == null || v === "" ? "\u2014" : String(v)));
   }
 
   // ---------- Integration ----------
@@ -1492,12 +1492,12 @@
       'export ANTHROPIC_BASE_URL="' +
       origin +
       '"\n' +
-      'export ANTHROPIC_AUTH_TOKEN="<客户端密钥>"';
+      'export ANTHROPIC_AUTH_TOKEN="<client key>"';
     var openai =
       'export OPENAI_BASE_URL="' +
       origin +
       '/v1"\n' +
-      'export OPENAI_API_KEY="<客户端密钥>"';
+      'export OPENAI_API_KEY="<client key>"';
     setText($("snippet-anthropic"), anthropic);
     setText($("snippet-openai"), openai);
   }
@@ -1508,10 +1508,10 @@
     var all = a + "\n\n" + o;
     copyText(all).then(
       function () {
-        toast("已复制接入片段", "ok");
+        toast("Integration snippet copied", "ok");
       },
       function () {
-        toast("复制失败", "err");
+        toast("Copy failed", "err");
       }
     );
   }
@@ -1531,7 +1531,7 @@
         var ok = document.execCommand("copy");
         document.body.removeChild(ta);
         if (ok) resolve();
-        else reject(new Error("复制失败"));
+        else reject(new Error("Copy failed"));
       } catch (e) {
         reject(e);
       }
@@ -1605,7 +1605,7 @@
       api("GET", "/admin/system")
         .then(function (sys) {
           state.system = sys;
-          setText($("shell-version"), (sys && sys.version) || "管理后台");
+          setText($("shell-version"), (sys && sys.version) || "Admin Panel");
           if (!location.hash || location.hash === "#" || location.hash === "#/") {
             navigate("credentials");
           }

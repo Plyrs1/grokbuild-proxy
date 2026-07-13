@@ -20,8 +20,7 @@
   --ghost: #1b2740;
   --radius: 12px;
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  --font: "Segoe UI", ui-sans-serif, system-ui, -apple-system, "PingFang SC",
-    "Noto Sans SC", sans-serif;
+  --font: "Inter", "Roboto", "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
 }
 
