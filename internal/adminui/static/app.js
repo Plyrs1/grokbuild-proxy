@@ -252,10 +252,35 @@
   // ---------- Formatting & Selection Helpers ----------
   
   function updateCredentialSelectionUI() {
+    var checkboxes = document.querySelectorAll(".cred-checkbox");
     var checked = document.querySelectorAll(".cred-checkbox:checked");
     
     show($("btn-cred-delete-selected"), checked.length > 0);
     show($("btn-cred-export-selected"), checked.length > 0);
+
+    var select = $("sel-cred-select");
+    if (select && checkboxes.length > 0) {
+      var allExpiredCount = document.querySelectorAll(".cred-checkbox[data-expired='true']").length;
+      var checkedExpiredCount = document.querySelectorAll(".cred-checkbox[data-expired='true']:checked").length;
+      
+      if (checked.length === checkboxes.length) {
+        select.value = "all";
+      } else if (checked.length === 0) {
+        select.value = "none";
+      } else if (allExpiredCount > 0 && checked.length === allExpiredCount && checkedExpiredCount === allExpiredCount) {
+        select.value = "expired";
+      } else {
+        // If it's partial and doesn't exactly match 'expired', we should probably just leave it
+        // alone, or if we want to be strict, set it to "none" but "none" implies Select None.
+        // Let's add a "partial" option if it doesn't exist to make it clearer, but wait, we can't easily modify the HTML if we don't have to.
+        // If we don't set select.value, it stays on whatever the user clicked. But what if they manually click a checkbox?
+        // Let's create an option if it's indeterminate.
+        var partialOpt = select.querySelector("option[value='partial']");
+        if (partialOpt) {
+          select.value = "partial";
+        }
+      }
+    }
   }
 
   function handleCredentialSelectChange() {
@@ -275,14 +300,8 @@
       }
     });
     
-    // Reset back to 'none' immediately so it acts more like a dropdown menu of actions
-    // but the actual selection state is reflected by the checkboxes
-    if (val !== "none") {
-      setTimeout(function() {
-        select.value = "none";
-      }, 50);
-    }
-    
+    // We no longer reset the select back to "none", 
+    // so it properly reflects the chosen batch operation.
     updateCredentialSelectionUI();
   }
   
@@ -473,6 +492,10 @@
     chk.type = "checkbox";
     chk.value = c.id || "";
     chk.dataset.id = c.id || "";
+    if (c.token_expired) {
+      chk.dataset.expired = "true";
+    }
+    chk.addEventListener("change", updateCredentialSelectionUI);
     // Store reference to raw object so we can use it for export later
     chk.dataset.raw = JSON.stringify(c);
     

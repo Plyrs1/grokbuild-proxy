@@ -1179,9 +1179,9 @@ func (h *Handlers) AdminSummary(w http.ResponseWriter, r *http.Request) {
 		working++
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"total_account":   total,
-		"working_account": working,
-		"error_account":   errorAccounts,
+		"total_accounts":   total,
+		"working_accounts": working,
+		"error_accounts":   errorAccounts,
 	})
 }
 
