@@ -63,11 +63,11 @@
             </div>
             <div class="row gap" style="width: 100%; justify-content: space-between; flex-wrap: wrap; margin-top: 8px;">
               <div class="row gap muted" style="align-items: center; min-height: 32px;">
-                <label class="row gap" style="margin-bottom: 0; cursor: pointer;">
-                  <input type="checkbox" id="chk-cred-select-all" />
-                  <span>Select All</span>
-                </label>
-                <button type="button" class="btn btn-sm btn-ghost" id="btn-cred-select-expired">Select Expired</button>
+                <select id="sel-cred-select" class="btn btn-sm" style="appearance: auto; padding-right: 24px; cursor: pointer; border: 1px solid var(--border-strong); background: var(--ghost); color: var(--text);">
+                  <option value="none" selected>Select None</option>
+                  <option value="all">Select All</option>
+                  <option value="expired">Select Expired</option>
+                </select>
                 <button type="button" class="btn btn-sm btn-danger hidden" id="btn-cred-delete-selected">Delete Selected</button>
                 <button type="button" class="btn btn-sm hidden" id="btn-cred-export-selected">Export Selected</button>
               </div>

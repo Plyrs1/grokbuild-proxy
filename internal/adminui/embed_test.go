@@ -29,8 +29,8 @@ func TestBillingDiagnosticsPreserveMissingValues(t *testing.T) {
 	for _, marker := range []string{
 		"var limit = optionalNum(m.monthlyLimit)",
 		"var weekPct = optionalNum(w.creditUsagePercent)",
-		`u.used != null ? fmtNum(u.used) : "未报告"`,
-		`u.weekPct != null ? u.weekPct.toFixed(1) + "%" : "未报告"`,
+		`u.used != null ? fmtNum(u.used) : "Not reported"`,
+		`u.weekPct != null ? u.weekPct.toFixed(1) + "%" : "Not reported"`,
 	} {
 		if !strings.Contains(source, marker) {
 			t.Fatalf("app.js missing billing null-preservation marker %q", marker)
@@ -48,9 +48,9 @@ func TestCredentialCardsExposeInspectionResult(t *testing.T) {
 		"c.last_inspection_at",
 		"c.last_inspection_status",
 		"c.last_inspection_error",
-		`lineMeta("最近巡检"`,
-		`lineMeta("巡检结果"`,
-		`lineMeta("巡检详情"`,
+		`lineMeta("Last inspection"`,
+		`lineMeta("Inspection result"`,
+		`lineMeta("Inspection details"`,
 	} {
 		if !strings.Contains(source, marker) {
 			t.Fatalf("app.js missing credential inspection marker %q", marker)

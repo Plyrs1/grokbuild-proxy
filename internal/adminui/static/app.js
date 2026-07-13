@@ -252,48 +252,35 @@
   // ---------- Formatting & Selection Helpers ----------
   
   function updateCredentialSelectionUI() {
-    var checkboxes = document.querySelectorAll(".cred-checkbox");
     var checked = document.querySelectorAll(".cred-checkbox:checked");
-    var selectAll = $("chk-cred-select-all");
-    
-    if (selectAll) {
-      selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
-      selectAll.indeterminate = checked.length > 0 && checked.length < checkboxes.length;
-    }
     
     show($("btn-cred-delete-selected"), checked.length > 0);
     show($("btn-cred-export-selected"), checked.length > 0);
   }
 
-  function handleCredentialSelectAll() {
-    var selectAll = $("chk-cred-select-all");
-    if (!selectAll) return;
+  function handleCredentialSelectChange() {
+    var select = $("sel-cred-select");
+    if (!select) return;
     
+    var val = select.value;
     var checkboxes = document.querySelectorAll(".cred-checkbox");
-    var isChecked = selectAll.checked;
     
     checkboxes.forEach(function(chk) {
-      chk.checked = isChecked;
-    });
-    
-    updateCredentialSelectionUI();
-  }
-
-  function handleCredentialSelectExpired() {
-    var checkboxes = document.querySelectorAll(".cred-checkbox");
-    var anyChecked = false;
-    
-    checkboxes.forEach(function(chk) {
-      if (chk.dataset.expired === "true") {
+      if (val === "all") {
         chk.checked = true;
-        anyChecked = true;
-      } else {
+      } else if (val === "none") {
         chk.checked = false;
+      } else if (val === "expired") {
+        chk.checked = chk.dataset.expired === "true";
       }
     });
     
-    if (!anyChecked) {
-      toast("No expired accounts found", "ok");
+    // Reset back to 'none' immediately so it acts more like a dropdown menu of actions
+    // but the actual selection state is reflected by the checkboxes
+    if (val !== "none") {
+      setTimeout(function() {
+        select.value = "none";
+      }, 50);
     }
     
     updateCredentialSelectionUI();
@@ -318,11 +305,6 @@
       .then(function(res) {
         toast("Deleted " + (res.deleted || ids.length) + " credentials", "ok");
         loadCredentials();
-        var selectAll = $("chk-cred-select-all");
-        if (selectAll) {
-          selectAll.checked = false;
-          selectAll.indeterminate = false;
-        }
       })
       .catch(function(err) {
         // Fallback to loop if bulk endpoint not available
@@ -338,11 +320,6 @@
         Promise.all(promises).then(function() {
           toast("Finished deleting selected credentials", "ok");
           loadCredentials();
-          var selectAll = $("chk-cred-select-all");
-          if (selectAll) {
-            selectAll.checked = false;
-            selectAll.indeterminate = false;
-          }
         });
       })
       .finally(function() {
@@ -354,37 +331,63 @@
     var checked = document.querySelectorAll(".cred-checkbox:checked");
     if (checked.length === 0) return;
     
-    var data = [];
+    var ids = [];
     checked.forEach(function(chk) {
-      try {
-        if (chk.dataset.raw) {
-          data.push(JSON.parse(chk.dataset.raw));
-        }
-      } catch(e) {
-        console.error("Failed to parse raw credential for export", e);
+      if (chk.dataset.id) {
+        ids.push(chk.dataset.id);
       }
     });
     
-    if (data.length === 0) {
-      toast("No valid data to export", "err");
+    if (ids.length === 0) {
+      toast("No valid credentials selected", "err");
       return;
     }
-    
-    var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    var url = URL.createObjectURL(blob);
-    
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = "grokbuild-credentials-" + new Date().toISOString().slice(0, 10) + ".json";
-    document.body.appendChild(a);
-    a.click();
-    
-    setTimeout(function() {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
-    
-    toast("Exported " + data.length + " credentials", "ok");
+
+    var btn = $("btn-cred-export-selected");
+    if (btn) btn.disabled = true;
+
+    // Call the new backend endpoint to generate the file
+    // The response is JSON that we download as a file
+    fetch("/admin/credentials/export-bulk", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + state.key
+      },
+      body: JSON.stringify({ ids: ids })
+    })
+      .then(function(res) {
+        if (!res.ok) {
+          return res.json().then(function(errBody) {
+            throw new Error(errBody.error || "Export failed with status " + res.status);
+          }).catch(function() {
+            throw new Error("Export failed with status " + res.status);
+          });
+        }
+        // Get raw response text, assume it's JSON array/object or text
+        return res.blob();
+      })
+      .then(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "grokbuild-credentials-" + new Date().toISOString().slice(0, 10) + ".json";
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(function() {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
+        
+        toast("Exported " + ids.length + " credentials", "ok");
+      })
+      .catch(function(err) {
+        toast("Export failed: " + err.message, "err");
+      })
+      .finally(function() {
+        if (btn) btn.disabled = false;
+      });
   }
 
   // ---------- Format helpers ----------
@@ -451,11 +454,6 @@
         });
         
         // Reset selection UI when list reloads
-        var selectAll = $("chk-cred-select-all");
-        if (selectAll) {
-          selectAll.checked = false;
-          selectAll.indeterminate = false;
-        }
         updateCredentialSelectionUI();
       })
       .catch(function (err) {
@@ -474,6 +472,7 @@
     var chk = el("input", "cred-checkbox");
     chk.type = "checkbox";
     chk.value = c.id || "";
+    chk.dataset.id = c.id || "";
     // Store reference to raw object so we can use it for export later
     chk.dataset.raw = JSON.stringify(c);
     
@@ -738,6 +737,10 @@
   }
 
   function showBilling(c) {
+    if (state.system && state.system.billing && state.system.billing.enabled === false) {
+      toast("Billing checks are disabled in config", "warn");
+      return;
+    }
     var body = el("div", "stack");
     body.appendChild(el("p", "muted", "Loading billing\u2026"));
     var closeBtn = el("button", "btn", "Close");
@@ -781,6 +784,11 @@
 
   function fillCredentialUsage(box, credId) {
     if (!box || !credId) return;
+    if (state.system && state.system.billing && state.system.billing.enabled === false) {
+      clear(box);
+      box.appendChild(el("div", "muted", "Billing checks are disabled in config"));
+      return;
+    }
     api("GET", "/admin/credentials/" + encodeURIComponent(credId) + "/billing")
       .then(function (snap) {
         clear(box);
@@ -1951,11 +1959,8 @@
     }
 
     // Credential Selection Action Bindings
-    var selectAll = $("chk-cred-select-all");
-    if (selectAll) selectAll.addEventListener("change", handleCredentialSelectAll);
-    
-    var selectExpired = $("btn-cred-select-expired");
-    if (selectExpired) selectExpired.addEventListener("click", handleCredentialSelectExpired);
+    var selectChange = $("sel-cred-select");
+    if (selectChange) selectChange.addEventListener("change", handleCredentialSelectChange);
     
     var deleteSelected = $("btn-cred-delete-selected");
     if (deleteSelected) deleteSelected.addEventListener("click", handleCredentialDeleteSelected);

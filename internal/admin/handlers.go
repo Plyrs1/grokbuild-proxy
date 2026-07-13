@@ -260,6 +260,37 @@ func subtleConstantTimeEq(a, b string) bool {
 	return v == 0
 }
 
+// ExportBulkCredentials POST /admin/credentials/export-bulk
+// Accepts {"ids": ["id1", "id2"]} and returns the raw (unmasked) credentials
+// as a JSON array compatible with the bulk importer format.
+func (h *Handlers) ExportBulkCredentials(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IDs []string `json:"ids"`
+	}
+	if err := decodeJSON(r, h.maxBody(), &body); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(body.IDs) == 0 {
+		writeErr(w, http.StatusBadRequest, "provide \"ids\" array")
+		return
+	}
+
+	credentials := make([]storage.Credential, 0, len(body.IDs))
+	for _, id := range body.IDs {
+		cred, err := h.Store.GetCredential(id)
+		if err != nil {
+			continue // skip missing IDs silently
+		}
+		credentials = append(credentials, cred)
+	}
+	if len(credentials) == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{"credentials": []storage.Credential{}})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"credentials": credentials})
+}
+
 // ListCredentials GET /admin/credentials
 func (h *Handlers) ListCredentials(w http.ResponseWriter, r *http.Request) {
 	creds, err := h.Store.ListCredentials()
@@ -1077,6 +1108,9 @@ func (h *Handlers) System(w http.ResponseWriter, r *http.Request) {
 		"chat_backend": h.Config.ChatBackend,
 		"anthropic": map[string]any{
 			"enabled": h.Config.Anthropic.Enabled,
+		},
+		"billing": map[string]any{
+			"enabled": h.Config.Billing.Enabled,
 		},
 		"limits": h.Config.Limits,
 		"pool":   summarizePool(credentials, time.Now()),
