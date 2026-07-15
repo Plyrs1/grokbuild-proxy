@@ -412,6 +412,63 @@
       });
   }
 
+  function handleCredentialExportAll() {
+    var creds = state.credentials || [];
+    if (!creds.length) {
+      toast("No credentials to export", "err");
+      return;
+    }
+    var ids = [];
+    for (var i = 0; i < creds.length; i++) {
+      if (creds[i].id) ids.push(creds[i].id);
+    }
+    if (!ids.length) {
+      toast("No valid credentials to export", "err");
+      return;
+    }
+
+    var btn = $("btn-cred-export-all");
+    if (btn) btn.disabled = true;
+
+    fetch("/admin/credentials/export-bulk", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + state.key
+      },
+      body: JSON.stringify({ ids: ids })
+    })
+      .then(function(res) {
+        if (!res.ok) {
+          return res.json().then(function(errBody) {
+            throw new Error(errBody.error || "Export failed with status " + res.status);
+          }).catch(function() {
+            throw new Error("Export failed with status " + res.status);
+          });
+        }
+        return res.blob();
+      })
+      .then(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "grokbuild-credentials-" + new Date().toISOString().slice(0, 10) + ".json";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function() {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
+        toast("Exported " + ids.length + " credentials", "ok");
+      })
+      .catch(function(err) {
+        toast("Export failed: " + err.message, "err");
+      })
+      .finally(function() {
+        if (btn) btn.disabled = false;
+      });
+  }
+
   // ---------- Format helpers ----------
 
   function fmtTime(v) {
@@ -468,20 +525,12 @@
   }
 
   function updateCredPaginationUI() {
-    var bar = $("cred-pagination");
     var total = (state.credentials && state.credentials.length) || 0;
-    if (!bar) return;
+    var bars = document.querySelectorAll("[data-pag-bar]");
 
     if (!total) {
-      show(bar, false);
+      bars.forEach(function (bar) { show(bar, false); });
       return;
-    }
-    show(bar, true);
-
-    var sizeSel = $("sel-cred-page-size");
-    if (sizeSel) {
-      var want = String(state.credPageSize);
-      if (sizeSel.value !== want) sizeSel.value = want;
     }
 
     clampCredPage();
@@ -491,13 +540,22 @@
     var start = size ? (page - 1) * size + 1 : 1;
     var end = size ? Math.min(page * size, total) : total;
 
-    setText($("cred-page-info"), "Showing " + start + "\u2013" + end + " of " + total);
-    setText($("cred-page-label"), "Page " + page + " of " + pages);
-
-    var prev = $("btn-cred-page-prev");
-    var next = $("btn-cred-page-next");
-    if (prev) prev.disabled = page <= 1;
-    if (next) next.disabled = page >= pages;
+    bars.forEach(function (bar) {
+      show(bar, true);
+      var sizeSel = bar.querySelector('[data-pag="size"]');
+      if (sizeSel) {
+        var want = String(state.credPageSize);
+        if (sizeSel.value !== want) sizeSel.value = want;
+      }
+      var info = bar.querySelector('[data-pag="info"]');
+      if (info) info.textContent = "Showing " + start + "\u2013" + end + " of " + total;
+      var label = bar.querySelector('[data-pag="label"]');
+      if (label) label.textContent = "Page " + page + " of " + pages;
+      var prev = bar.querySelector('[data-pag="prev"]');
+      if (prev) prev.disabled = page <= 1;
+      var next = bar.querySelector('[data-pag="next"]');
+      if (next) next.disabled = page >= pages;
+    });
   }
 
   function renderCredentialsPage() {
@@ -544,7 +602,7 @@
     if (!list) return;
     clear(list);
     show(empty, false);
-    show($("cred-pagination"), false);
+    document.querySelectorAll("[data-pag-bar]").forEach(function (bar) { show(bar, false); });
 
     // Also load summary stats
     api("GET", "/admin/summary")
@@ -2081,25 +2139,25 @@
     var exportSelected = $("btn-cred-export-selected");
     if (exportSelected) exportSelected.addEventListener("click", handleCredentialExportSelected);
 
-    var pageSizeSel = $("sel-cred-page-size");
-    if (pageSizeSel) {
-      pageSizeSel.value = String(state.credPageSize);
-      pageSizeSel.addEventListener("change", function () {
-        setCredPageSize(pageSizeSel.value);
+    var exportAll = $("btn-cred-export-all");
+    if (exportAll) exportAll.addEventListener("click", handleCredentialExportAll);
+
+    document.querySelectorAll('[data-pag="size"]').forEach(function (sel) {
+      sel.value = String(state.credPageSize);
+      sel.addEventListener("change", function () {
+        setCredPageSize(sel.value);
       });
-    }
-    var pagePrev = $("btn-cred-page-prev");
-    if (pagePrev) {
-      pagePrev.addEventListener("click", function () {
+    });
+    document.querySelectorAll('[data-pag="prev"]').forEach(function (btn) {
+      btn.addEventListener("click", function () {
         setCredPage(state.credPage - 1);
       });
-    }
-    var pageNext = $("btn-cred-page-next");
-    if (pageNext) {
-      pageNext.addEventListener("click", function () {
+    });
+    document.querySelectorAll('[data-pag="next"]').forEach(function (btn) {
+      btn.addEventListener("click", function () {
         setCredPage(state.credPage + 1);
       });
-    }
+    });
 
     var settingsRefresh = $("btn-settings-refresh");
     if (settingsRefresh) settingsRefresh.addEventListener("click", loadSettings);

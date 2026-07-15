@@ -71,6 +71,7 @@ func TestCredentialsPaginationControls(t *testing.T) {
 		"credPageSlice",
 		// 0 means show all
 		"state.credPageSize = n",
+		"handleCredentialExportAll",
 	} {
 		if !strings.Contains(source, marker) {
 			t.Fatalf("app.js missing credentials pagination marker %q", marker)
@@ -83,11 +84,12 @@ func TestCredentialsPaginationControls(t *testing.T) {
 	}
 	page := string(html)
 	for _, marker := range []string{
-		`id="cred-pagination"`,
-		`id="sel-cred-page-size"`,
-		`id="btn-cred-page-prev"`,
-		`id="btn-cred-page-next"`,
+		`data-pag-bar`,
+		`data-pag="size"`,
+		`data-pag="prev"`,
+		`data-pag="next"`,
 		`value="0">All</option>`,
+		`id="btn-cred-export-all"`,
 	} {
 		if !strings.Contains(page, marker) {
 			t.Fatalf("index.html missing credentials pagination marker %q", marker)

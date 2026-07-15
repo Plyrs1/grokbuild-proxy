@@ -71,6 +71,7 @@
                 </select>
                 <button type="button" class="btn btn-sm btn-danger hidden" id="btn-cred-delete-selected">Delete Selected</button>
                 <button type="button" class="btn btn-sm hidden" id="btn-cred-export-selected">Export Selected</button>
+                <button type="button" class="btn btn-sm" id="btn-cred-export-all">Export All</button>
               </div>
               <div class="row gap">
                 <button type="button" class="btn" id="btn-cred-assign-proxy">Assign Proxy</button>
@@ -85,12 +86,11 @@
             <h3>No Credentials</h3>
             <p class="muted">Import from the default local path, or batch upload Grok / CPA JSON and SSO files.</p>
           </div>
-          <div id="cred-list" class="card-grid"></div>
-          <div id="cred-pagination" class="pagination-bar card hidden">
+          <div class="pagination-bar card hidden" data-pag-bar>
             <div class="row gap pagination-meta">
               <label class="row gap pagination-size">
                 <span class="muted">Per page</span>
-                <select id="sel-cred-page-size" class="btn btn-sm pagination-select" aria-label="Page size">
+                <select class="btn btn-sm pagination-select" data-pag="size" aria-label="Page size">
                   <option value="12">12</option>
                   <option value="25">25</option>
                   <option value="50">50</option>
@@ -98,12 +98,33 @@
                   <option value="0">All</option>
                 </select>
               </label>
-              <span id="cred-page-info" class="muted">Showing 0 of 0</span>
+              <span class="muted" data-pag="info">Showing 0 of 0</span>
             </div>
             <div class="row gap pagination-nav">
-              <button type="button" class="btn btn-sm" id="btn-cred-page-prev" aria-label="Previous page">Previous</button>
-              <span id="cred-page-label" class="muted">Page 1 of 1</span>
-              <button type="button" class="btn btn-sm" id="btn-cred-page-next" aria-label="Next page">Next</button>
+              <button type="button" class="btn btn-sm" data-pag="prev" aria-label="Previous page">Previous</button>
+              <span class="muted" data-pag="label">Page 1 of 1</span>
+              <button type="button" class="btn btn-sm" data-pag="next" aria-label="Next page">Next</button>
+            </div>
+          </div>
+          <div id="cred-list" class="card-grid"></div>
+          <div class="pagination-bar card hidden" data-pag-bar>
+            <div class="row gap pagination-meta">
+              <label class="row gap pagination-size">
+                <span class="muted">Per page</span>
+                <select class="btn btn-sm pagination-select" data-pag="size" aria-label="Page size">
+                  <option value="12">12</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="0">All</option>
+                </select>
+              </label>
+              <span class="muted" data-pag="info">Showing 0 of 0</span>
+            </div>
+            <div class="row gap pagination-nav">
+              <button type="button" class="btn btn-sm" data-pag="prev" aria-label="Previous page">Previous</button>
+              <span class="muted" data-pag="label">Page 1 of 1</span>
+              <button type="button" class="btn btn-sm" data-pag="next" aria-label="Next page">Next</button>
             </div>
           </div>
         </section>

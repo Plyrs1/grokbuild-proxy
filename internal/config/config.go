@@ -225,7 +225,7 @@ func Default() Config {
 			MaxFiles:         100,
 			MaxFileBytes:     4 * 1024 * 1024,
 			MaxTotalBytes:    16 * 1024 * 1024,
-			MaxEntries:       1000,
+			MaxEntries:       math.MaxInt32,
 			MaxQueuedJobs:    32,
 			MaxQueuedBytes:   64 * 1024 * 1024,
 			MaxRetainedJobs:  128,

@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -159,7 +160,7 @@ func NewManager(store Store, converter Converter, limits Limits) (*Manager, erro
 		limits.MaxTotalBytes = 16 << 20
 	}
 	if limits.MaxEntries <= 0 {
-		limits.MaxEntries = 1000
+		limits.MaxEntries = math.MaxInt32
 	}
 	if limits.MaxQueuedJobs <= 0 {
 		limits.MaxQueuedJobs = 32
