@@ -58,6 +58,43 @@ func TestCredentialCardsExposeInspectionResult(t *testing.T) {
 	}
 }
 
+func TestCredentialsPaginationControls(t *testing.T) {
+	app, err := ReadStatic("app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(app)
+	for _, marker := range []string{
+		"credPageSize",
+		"setCredPageSize",
+		"renderCredentialsPage",
+		"credPageSlice",
+		// 0 means show all
+		"state.credPageSize = n",
+	} {
+		if !strings.Contains(source, marker) {
+			t.Fatalf("app.js missing credentials pagination marker %q", marker)
+		}
+	}
+
+	html, err := ReadStatic("index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(html)
+	for _, marker := range []string{
+		`id="cred-pagination"`,
+		`id="sel-cred-page-size"`,
+		`id="btn-cred-page-prev"`,
+		`id="btn-cred-page-next"`,
+		`value="0">All</option>`,
+	} {
+		if !strings.Contains(page, marker) {
+			t.Fatalf("index.html missing credentials pagination marker %q", marker)
+		}
+	}
+}
+
 func TestIndexHandlerServesHTMLWithoutAuth(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
 	rec := httptest.NewRecorder()

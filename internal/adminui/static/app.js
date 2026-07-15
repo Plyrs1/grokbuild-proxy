@@ -10,6 +10,9 @@
     system: null,
     settings: null,
     busy: false,
+    credentials: [],
+    credPage: 1,
+    credPageSize: 12, // 0 means show all
   };
 
   // ---------- DOM helpers (no innerHTML for untrusted data) ----------
@@ -443,13 +446,106 @@
 
   // ---------- Credentials ----------
 
+  function credPageCount() {
+    var total = (state.credentials && state.credentials.length) || 0;
+    if (!total) return 1;
+    if (!state.credPageSize) return 1;
+    return Math.max(1, Math.ceil(total / state.credPageSize));
+  }
+
+  function clampCredPage() {
+    var pages = credPageCount();
+    if (state.credPage < 1) state.credPage = 1;
+    if (state.credPage > pages) state.credPage = pages;
+  }
+
+  function credPageSlice() {
+    var creds = state.credentials || [];
+    if (!state.credPageSize) return creds.slice();
+    clampCredPage();
+    var start = (state.credPage - 1) * state.credPageSize;
+    return creds.slice(start, start + state.credPageSize);
+  }
+
+  function updateCredPaginationUI() {
+    var bar = $("cred-pagination");
+    var total = (state.credentials && state.credentials.length) || 0;
+    if (!bar) return;
+
+    if (!total) {
+      show(bar, false);
+      return;
+    }
+    show(bar, true);
+
+    var sizeSel = $("sel-cred-page-size");
+    if (sizeSel) {
+      var want = String(state.credPageSize);
+      if (sizeSel.value !== want) sizeSel.value = want;
+    }
+
+    clampCredPage();
+    var pages = credPageCount();
+    var page = state.credPage;
+    var size = state.credPageSize;
+    var start = size ? (page - 1) * size + 1 : 1;
+    var end = size ? Math.min(page * size, total) : total;
+
+    setText($("cred-page-info"), "Showing " + start + "\u2013" + end + " of " + total);
+    setText($("cred-page-label"), "Page " + page + " of " + pages);
+
+    var prev = $("btn-cred-page-prev");
+    var next = $("btn-cred-page-next");
+    if (prev) prev.disabled = page <= 1;
+    if (next) next.disabled = page >= pages;
+  }
+
+  function renderCredentialsPage() {
+    var list = $("cred-list");
+    var empty = $("cred-empty");
+    if (!list) return;
+
+    clear(list);
+    var creds = state.credentials || [];
+    if (!creds.length) {
+      show(empty, true);
+      updateCredPaginationUI();
+      updateCredentialSelectionUI();
+      return;
+    }
+    show(empty, false);
+
+    credPageSlice().forEach(function (c) {
+      list.appendChild(renderCredentialCard(c));
+    });
+
+    updateCredPaginationUI();
+    updateCredentialSelectionUI();
+  }
+
+  function setCredPage(page) {
+    state.credPage = page;
+    clampCredPage();
+    renderCredentialsPage();
+  }
+
+  function setCredPageSize(size) {
+    var n = parseInt(size, 10);
+    if (isNaN(n) || n < 0) n = 12;
+    // 0 = show all
+    state.credPageSize = n;
+    state.credPage = 1;
+    renderCredentialsPage();
+  }
+
   function loadCredentials() {
     var list = $("cred-list");
     var empty = $("cred-empty");
     if (!list) return;
     clear(list);
     show(empty, false);
-    
+    show($("cred-pagination"), false);
+
     // Also load summary stats
     api("GET", "/admin/summary")
       .then(function (summary) {
@@ -463,19 +559,13 @@
 
     api("GET", "/admin/credentials")
       .then(function (data) {
-        var creds = (data && data.credentials) || [];
-        if (!creds.length) {
-          show(empty, true);
-          return;
-        }
-        creds.forEach(function (c) {
-          list.appendChild(renderCredentialCard(c));
-        });
-        
-        // Reset selection UI when list reloads
-        updateCredentialSelectionUI();
+        state.credentials = (data && data.credentials) || [];
+        clampCredPage();
+        renderCredentialsPage();
       })
       .catch(function (err) {
+        state.credentials = [];
+        renderCredentialsPage();
         toast("Failed to load credentials: " + err.message, "err");
       });
   }
@@ -1990,6 +2080,26 @@
     
     var exportSelected = $("btn-cred-export-selected");
     if (exportSelected) exportSelected.addEventListener("click", handleCredentialExportSelected);
+
+    var pageSizeSel = $("sel-cred-page-size");
+    if (pageSizeSel) {
+      pageSizeSel.value = String(state.credPageSize);
+      pageSizeSel.addEventListener("change", function () {
+        setCredPageSize(pageSizeSel.value);
+      });
+    }
+    var pagePrev = $("btn-cred-page-prev");
+    if (pagePrev) {
+      pagePrev.addEventListener("click", function () {
+        setCredPage(state.credPage - 1);
+      });
+    }
+    var pageNext = $("btn-cred-page-next");
+    if (pageNext) {
+      pageNext.addEventListener("click", function () {
+        setCredPage(state.credPage + 1);
+      });
+    }
 
     var settingsRefresh = $("btn-settings-refresh");
     if (settingsRefresh) settingsRefresh.addEventListener("click", loadSettings);

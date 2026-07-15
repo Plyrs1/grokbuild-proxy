@@ -106,6 +106,35 @@ textarea {
   gap: 14px;
 }
 
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding: 10px 14px;
+}
+
+.pagination-meta,
+.pagination-nav {
+  align-items: center;
+}
+
+.pagination-size {
+  align-items: center;
+}
+
+.pagination-select {
+  appearance: auto;
+  padding-right: 24px;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: var(--ghost);
+  color: var(--text);
+  min-width: 72px;
+}
+
 .btn {
   appearance: none;
   border: 1px solid var(--border-strong);
